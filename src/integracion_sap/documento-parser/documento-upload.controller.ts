@@ -61,7 +61,7 @@ export class DocumentoUploadController {
   async procesar(
     @Param('tipo') tipo: string,
     @Param('uploadId') uploadId: string,
-    @Body() body: { mapeoColumnas?: Record<string, string>; ubicacionOverrideId?: number; empresa?: string },
+    @Body() body: { mapeoColumnas?: Record<string, string>; ubicacionOverrideId?: number; empresa?: string; referenciaSap?: string },
   ) {
     if (tipo === 'INVENTARIO_INICIAL' || tipo === 'ACTUALIZACION_INVENTARIO') {
       return this.uploadService.iniciarJob(uploadId, body.mapeoColumnas, body.ubicacionOverrideId);
@@ -72,6 +72,7 @@ export class DocumentoUploadController {
         tipo,
         body.empresa ?? 'DEFAULT',
         body.mapeoColumnas,
+        body.referenciaSap,
       );
     }
     throw new BadRequestException(`Tipo "${tipo}" no soportado aún en este endpoint.`);

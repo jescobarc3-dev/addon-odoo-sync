@@ -22,6 +22,8 @@ export interface ResultadoParse {
   totalFilas: number;
   hojas: string[];
   hojaActual: string;
+  /** Número de documento SAP extraído del encabezado del PDF (ej: "12345") */
+  docNumSap?: string;
 }
 
 export function parseNumero(val: any): number {
@@ -211,7 +213,7 @@ export class ArchivoParserService {
   }
 
   private async parsearPdfConPdfjs(buffer: Buffer): Promise<ResultadoParse> {
-    // pdfjs-dist 4.x usa ESM — importar dinámicamente desde CJS de Node.js
+    // pdfjs-dist 4.x: solo .mjs — importar dinámicamente desde Node.js CJS
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const workerPath: string = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
     const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.mjs' as string);
@@ -227,7 +229,7 @@ export class ArchivoParserService {
       useSystemFonts: true,
     }).promise;
 
-    // ── 1. Recolectar todos los ítems de texto con posición ──────────────────
+    // ── 1. Recolectar ítems con posición ─────────────────────────────────────
     const allItems: TxtItem[] = [];
     let pageOffsetY = 0;
 
@@ -239,55 +241,69 @@ export class ArchivoParserService {
       for (const item of content.items as any[]) {
         if (!item.str?.trim()) continue;
         const x = item.transform[4];
-        // PDF Y es bottom-up; invertir y sumar offset de página
+        // PDF origin es bottom-left → invertir Y para tener top-down (Y=0 = tope)
         const y = pageOffsetY + (viewport.height - item.transform[5]);
-        allItems.push({ x: Math.round(x), y: Math.round(y), text: item.str.trim() });
+        allItems.push({ x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, text: item.str.trim() });
       }
-
       pageOffsetY += viewport.height + 20;
     }
 
-    // ── 2. Agrupar ítems por fila (tolerancia 4pt en Y) ──────────────────────
+    // ── 2. Agrupar por fila (4pt tolerancia Y) — sort ASCENDENTE = top→bottom ─
     const YTOL = 4;
     const rows: Array<{ y: number; items: TxtItem[] }> = [];
 
     for (const item of allItems) {
       const row = rows.find(r => Math.abs(r.y - item.y) <= YTOL);
-      if (row) {
-        row.items.push(item);
-      } else {
-        rows.push({ y: item.y, items: [item] });
-      }
+      if (row) row.items.push(item);
+      else rows.push({ y: item.y, items: [item] });
     }
 
+    // a.y - b.y = ascendente = los items del encabezado quedan PRIMERO
     rows.sort((a, b) => a.y - b.y);
     for (const row of rows) row.items.sort((a, b) => a.x - b.x);
 
-    // ── 3. Detectar fila de cabecera ─────────────────────────────────────────
-    // Palabras clave para cabeceras de tablas SAP Guatemala
+    // ── 3. Extraer DocNum del encabezado (ej: "Entrega No. 1018167") ──────────
+    // Busca "No." seguido de dígitos en las primeras filas del reporte
+    const RE_DOCNUM = /n[oºO°]\.?\s*(\d{4,9})/i;
+    let docNumSap: string | undefined;
+    for (let i = 0; i < Math.min(rows.length, 15); i++) {
+      const txt = rows[i].items.map(it => it.text).join(' ');
+      const m = txt.match(RE_DOCNUM);
+      if (m) { docNumSap = m[1]; break; }
+    }
+    if (docNumSap) this.logger.log(`PDF DocNum SAP: ${docNumSap}`);
+
+    // ── 4. Detectar fila de cabecera ─────────────────────────────────────────
     const HEADER_KEYS: Record<string, string[]> = {
       itemCode: ['codigo', 'articulo', 'cod', 'item', 'referencia', 'sku'],
       itemName: ['descripcion', 'nombre', 'detalle'],
-      onHand: ['cantidad', 'ctd', 'qty', 'existencia'],
-      uomCode: ['u.m', 'um ', 'uom', 'unidad', 'medida'],
-      whsCode: ['almacen', 'bodega', 'deposito', 'warehouse'],
+      onHand:   ['cantidad', 'ctd', 'qty', 'existencia'],
+      uomCode:  ['u.m', 'uom', 'unidad', 'medida'],
+      whsCode:  ['almacen', 'bodega', 'deposito', 'warehouse'],
       precioUnitario: ['precio', 'costo', 'p.u', 'valor unit'],
     };
 
     let headerIdx = -1;
-    const colX: Record<string, number> = {};
+    // Posición X de cada columna según el texto del HEADER (puede estar centrado)
+    const headerColX: Array<{ field: string; x: number }> = [];
 
     for (let i = 0; i < rows.length; i++) {
-      const rowText = rows[i].items.map(it => normalizar(it.text)).join(' ');
+      const rowNorm = rows[i].items.map(it => ({ x: it.x, n: normalizar(it.text), raw: it.text }));
       let hits = 0;
+      const detected: Array<{ field: string; x: number }> = [];
+      const usedItemIndices = new Set<number>();
 
       for (const [field, kws] of Object.entries(HEADER_KEYS)) {
         for (const kw of kws) {
-          if (rowText.includes(kw)) {
-            if (!colX[field]) {
-              const hit = rows[i].items.find(it => normalizar(it.text).includes(kw));
-              if (hit) colX[field] = hit.x;
-            }
+          const idx = rowNorm.findIndex((it, j) => {
+            if (usedItemIndices.has(j)) return false;
+            // Descartar ítems largos (>40 chars) o con patrón "label: valor" — son metadatos del reporte, no columnas de tabla
+            if (it.raw.length > 40 || it.raw.includes(': ') || it.raw.includes(':')) return false;
+            return it.n.includes(kw);
+          });
+          if (idx >= 0) {
+            usedItemIndices.add(idx);
+            detected.push({ field, x: rowNorm[idx].x });
             hits++;
             break;
           }
@@ -296,6 +312,7 @@ export class ArchivoParserService {
 
       if (hits >= 2) {
         headerIdx = i;
+        headerColX.push(...detected);
         break;
       }
     }
@@ -303,48 +320,115 @@ export class ArchivoParserService {
     const advertencias: string[] = [];
 
     if (headerIdx < 0) {
-      advertencias.push(
-        'No se detectó la cabecera de la tabla en el PDF. ' +
-        'Verifica que sea un reporte de SAP (Salida/Entrada de Inventario) con texto, no escaneado.',
-      );
-      return { filas: [], rawRows: [], columnasDetectadas: {}, headersDisponibles: [], advertencias, totalFilas: 0, hojas: ['PDF'], hojaActual: 'PDF' };
+      advertencias.push('No se detectó la cabecera de la tabla en el PDF. Verifica que sea un reporte SAP con texto, no escaneado.');
+      return { filas: [], rawRows: [], columnasDetectadas: {}, headersDisponibles: [], advertencias, totalFilas: 0, hojas: ['PDF'], hojaActual: 'PDF', docNumSap };
     }
 
-    // ── 4. Parsear filas de datos ─────────────────────────────────────────────
-    const COL_TOL = 70; // tolerancia en px para asignar ítem a columna
+    this.logger.log(`PDF header fila ${headerIdx}: ${rows[headerIdx].items.map(it => `"${it.text}"@x${it.x}`).join(' | ')}`);
 
-    const getCol = (row: typeof rows[0], field: string): string => {
-      const cx = colX[field];
-      if (cx === undefined) return '';
-      const candidates = row.items
-        .filter(it => Math.abs(it.x - cx) <= COL_TOL)
-        .sort((a, b) => Math.abs(a.x - cx) - Math.abs(b.x - cx));
-      return candidates[0]?.text ?? '';
+    // ── 5. Construir bandas de columna ────────────────────────────────────────
+    // Crystal Reports CENTRA el texto del header pero los datos empiezan en el
+    // borde izquierdo. Usar el punto medio entre columnas como frontera de banda,
+    // en vez de header_X ± tolerancia (que fallaría por el offset de centrado).
+    headerColX.sort((a, b) => a.x - b.x);
+
+    const bands: Array<{ field: string; minX: number; maxX: number }> = headerColX.map((col, i) => ({
+      field: col.field,
+      minX: i === 0 ? -Infinity : (headerColX[i - 1].x + col.x) / 2,
+      maxX: i === headerColX.length - 1 ? Infinity : (col.x + headerColX[i + 1].x) / 2,
+    }));
+
+    const assignBand = (item: TxtItem): string | null => {
+      for (const b of bands) {
+        if (item.x >= b.minX && item.x < b.maxX) return b.field;
+      }
+      return null;
     };
 
+    this.logger.log(`PDF bandas iniciales: ${bands.map(b => `${b.field}[${Math.round(b.minX)},${Math.round(b.maxX)})`).join(' | ')}`);
+
+    // ── 5b. Recalibrar banda itemCode/itemName con la primera fila de datos ────
+    // Crystal Reports CENTRA los headers sobre columnas anchas (ej: DESCRIPCION a
+    // x=224 aunque los datos arranquen en x=84). El midpoint calculado queda muy a
+    // la derecha y arrastra texto de descripción a la banda de itemCode.
+    // Solución: buscar en las primeras filas de datos dónde empieza realmente el
+    // texto alfabético largo (descripción) y reajustar la frontera de banda.
+    {
+      const itemCodeBand = bands.find(b => b.field === 'itemCode');
+      const itemNameBand = bands.find(b => b.field === 'itemName');
+      if (itemCodeBand && itemNameBand) {
+        for (let i = headerIdx + 1; i < Math.min(rows.length, headerIdx + 6); i++) {
+          const dr = rows[i];
+          if (dr.items.length <= 1) continue;
+          const descCandidates = dr.items.filter(it =>
+            /[A-Za-zÁÉÍÓÚáéíóúÑñ]{2,}/.test(it.text) &&
+            it.text.length > 3 &&
+            it.x >= (itemCodeBand.minX === -Infinity ? -99999 : itemCodeBand.minX) &&
+            it.x < itemNameBand.maxX,
+          );
+          if (descCandidates.length > 0) {
+            descCandidates.sort((a, b) => a.x - b.x);
+            const actualDescStartX = descCandidates[0].x - 0.5;
+            if (actualDescStartX < itemCodeBand.maxX) {
+              this.logger.log(`PDF recalibración itemCode.maxX: ${itemCodeBand.maxX.toFixed(1)} → ${actualDescStartX.toFixed(1)}`);
+              itemCodeBand.maxX = actualDescStartX;
+              itemNameBand.minX = actualDescStartX;
+            }
+            break;
+          }
+        }
+      }
+      this.logger.log(`PDF bandas finales: ${bands.map(b => `${b.field}[${Math.round(b.minX)},${Math.round(b.maxX)})`).join(' | ')}`);
+    }
+
+    // ── 6. Parsear filas de datos ─────────────────────────────────────────────
     const filas: FilaInventario[] = [];
+    // En reportes SAP GT el almacén puede aparecer como fila solitaria (ej: ALMACEN06)
+    // después de las líneas de detalle, no como columna. Se captura y se aplica a todo.
+    let whsGlobal = 'DEFAULT';
 
     for (let i = headerIdx + 1; i < rows.length; i++) {
       const row = rows[i];
-      if (row.items.length < 2) continue; // saltar filas dispersas (pie de página, etc.)
 
-      const itemCode = getCol(row, 'itemCode');
-      // Código de artículo SAP: alfanumérico, mínimo 2 chars
-      if (!itemCode || !/^[A-Z0-9\-_.]{2,}/i.test(itemCode)) continue;
+      // Fila solitaria: puede ser código de almacén (ALMACEN06, BODEGA01…)
+      if (row.items.length === 1) {
+        const txt = row.items[0].text;
+        if (/^(?:ALMACEN|BODEGA|WHS|WAREHOUSE)\d*/i.test(txt) || /^[A-Z]{2,}\d+$/i.test(txt)) {
+          whsGlobal = txt.toUpperCase();
+        }
+        continue;
+      }
 
-      const cantStr = getCol(row, 'onHand').replace(/\s/g, '');
+      // Asignar ítems a columnas por banda
+      const cells: Record<string, string[]> = {};
+      for (const item of row.items) {
+        // Ignorar columna de numeración de líneas: leftmost (<20px) + entero pequeño
+        if (item.x < 20 && /^\d{1,3}$/.test(item.text.trim())) continue;
+
+        const field = assignBand(item);
+        if (field) {
+          if (!cells[field]) cells[field] = [];
+          cells[field].push(item.text);
+        }
+      }
+
+      const itemCode = (cells['itemCode'] ?? []).join('').trim().toUpperCase();
+      // SAP item codes: alfanumérico con guiones/puntos, mínimo 2 chars
+      if (!itemCode || !/^[A-Z0-9][A-Z0-9\-_.]{1,}/i.test(itemCode)) continue;
+
+      const cantStr = (cells['onHand'] ?? []).join('').replace(/\s/g, '');
       const onHand = parseNumero(cantStr);
       if (isNaN(onHand)) continue;
 
-      const precioStr = getCol(row, 'precioUnitario');
-      const precio = precioStr ? parseNumero(precioStr) : NaN;
+      const precioRaw = (cells['precioUnitario'] ?? []).join('').trim();
+      const precio = precioRaw ? parseNumero(precioRaw) : NaN;
 
       filas.push({
-        itemCode: itemCode.trim().toUpperCase(),
-        itemName: getCol(row, 'itemName').trim() || itemCode,
-        whsCode: getCol(row, 'whsCode').trim() || 'DEFAULT',
+        itemCode,
+        itemName: (cells['itemName'] ?? []).join(' ').trim() || itemCode,
+        whsCode: (cells['whsCode'] ?? []).join('').trim() || whsGlobal,
         onHand,
-        uomCode: getCol(row, 'uomCode').trim() || 'UND',
+        uomCode: (cells['uomCode'] ?? []).join('').trim() || 'UND',
         precioUnitario: isNaN(precio) ? null : precio,
         precioTotal: null,
         filaOriginal: i - headerIdx,
@@ -352,28 +436,28 @@ export class ArchivoParserService {
       });
     }
 
-    if (filas.length === 0) {
-      advertencias.push(
-        'PDF procesado pero sin líneas de detalle. ' +
-        'Verifica que el formato sea el reporte estándar de SAP.',
-      );
-    } else {
-      advertencias.push(
-        `PDF extraído con posicionamiento (pdfjs-dist): ${filas.length} líneas. ` +
-        'Revisa la vista previa y corrige el mapeo si es necesario.',
-      );
+    // Aplicar almacén global a filas que quedaron con DEFAULT
+    for (const f of filas) {
+      if (f.whsCode === 'DEFAULT') f.whsCode = whsGlobal;
     }
 
-    this.logger.log(`PDF pdfjs: ${filas.length} filas extraídas, headerIdx=${headerIdx}`);
+    this.logger.log(`PDF pdfjs: ${filas.length} filas extraídas, headerIdx=${headerIdx}, almacén=${whsGlobal}`);
+
+    if (filas.length === 0) {
+      advertencias.push('PDF procesado pero sin líneas de detalle. Verifica que sea el reporte estándar de SAP.');
+    } else {
+      advertencias.push(`PDF extraído (pdfjs-dist): ${filas.length} líneas. Almacén: ${whsGlobal}.`);
+    }
 
     return {
       filas, rawRows: [],
-      columnasDetectadas: Object.fromEntries(Object.entries(colX).map(([k, x]) => [k, `pos_x=${x}`])),
+      columnasDetectadas: Object.fromEntries(headerColX.map(c => [c.field, `pos_x=${c.x}`])),
       headersDisponibles: [],
       advertencias,
       totalFilas: filas.length,
       hojas: ['PDF'],
       hojaActual: 'PDF',
+      docNumSap,
     };
   }
 

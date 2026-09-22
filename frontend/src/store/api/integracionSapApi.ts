@@ -37,7 +37,7 @@ export interface Dashboard {
 export const integracionSapApi = createApi({
   reducerPath: 'integracionSapApi',
   baseQuery: fetchBaseQuery({ baseUrl: '/api/integracion-sap' }),
-  tagTypes: ['Registro', 'MapeoItem'],
+  tagTypes: ['Registro', 'MapeoItem', 'Catalogo'],
   endpoints: (builder) => ({
     getRegistros: builder.query<
       { items: RegistroSincronizacion[]; total: number },
@@ -98,12 +98,12 @@ export const integracionSapApi = createApi({
     }),
     procesarDocumento: builder.mutation<
       { jobId: string; total: number },
-      { tipo: string; uploadId: string; mapeoColumnas?: Record<string, string>; ubicacionOverrideId?: number }
+      { tipo: string; uploadId: string; mapeoColumnas?: Record<string, string>; ubicacionOverrideId?: number; referenciaSap?: string }
     >({
-      query: ({ tipo, uploadId, mapeoColumnas, ubicacionOverrideId }) => ({
+      query: ({ tipo, uploadId, mapeoColumnas, ubicacionOverrideId, referenciaSap }) => ({
         url: `/documentos/${tipo}/procesar/${uploadId}`,
         method: 'POST',
-        body: { mapeoColumnas, ubicacionOverrideId },
+        body: { mapeoColumnas, ubicacionOverrideId, referenciaSap },
       }),
       invalidatesTags: ['Registro'],
     }),
@@ -156,6 +156,13 @@ export const integracionSapApi = createApi({
         body: { hoja },
       }),
     }),
+    getCatalogo: builder.query<
+      { items: Array<{ itemCode: string; itemName: string; uomCode?: string; precioUnitario?: number | null }>; total: number },
+      { q?: string; empresa?: string; limit?: number }
+    >({
+      query: (params) => ({ url: '/catalogo/items', params }),
+      providesTags: ['Catalogo'],
+    }),
   }),
 });
 
@@ -175,4 +182,5 @@ export const {
   useGetJobQuery,
   useGetHistorialQuery,
   useCambiarHojaMutation,
+  useGetCatalogoQuery,
 } = integracionSapApi;

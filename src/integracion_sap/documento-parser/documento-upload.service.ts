@@ -7,6 +7,7 @@ import { IOdooCatalogoPort, ODOO_CATALOGO_PORT, ItemLote } from '../salida-bodeg
 import { IOdooInventarioPort, ODOO_INVENTARIO_PORT } from '../salida-bodega/application/ports/odoo-inventario.port';
 import { IMapeoItemRepository, MAPEO_ITEM_REPOSITORY, TipoOperacionBodega } from '../salida-bodega/domain/repositories/mapeo-item.repository';
 import { HistorialCargaOrmEntity } from './historial-carga.orm-entity';
+import { CatalogoItemService } from './catalogo-item.service';
 
 export interface SesionUpload {
   id: string;
@@ -54,6 +55,7 @@ export class DocumentoUploadService {
 
   constructor(
     private readonly parser: ArchivoParserService,
+    private readonly catalogo: CatalogoItemService,
     @Inject(ODOO_CATALOGO_PORT)
     private readonly odooCatalogo: IOdooCatalogoPort,
     @Inject(ODOO_INVENTARIO_PORT)
@@ -227,6 +229,18 @@ export class DocumentoUploadService {
 
     this.logger.log(`Job ${jobId} completado: ${loteResult.ajustados} ajustados, ${loteResult.sinCambio} sin cambio`);
     await this._guardarHistorial(sesion.tipo, sesion._originalname ?? null, resultadoFinal, null);
+
+    // Poblar catálogo local con los items de esta carga (INVENTARIO_INICIAL o ACTUALIZACION_INVENTARIO)
+    // Permite al parser PDF validar códigos en cargas futuras sin conectar a SAP ni Odoo.
+    this.catalogo.upsertLote(
+      empresa,
+      filasValidas.map(f => ({
+        itemCode: f.itemCode,
+        itemName: f.itemName,
+        uomCode: f.uomCode || undefined,
+        precioUnitario: f.precioUnitario ?? null,
+      })),
+    ).catch(e => this.logger.warn(`Catalogo upsert falló (no crítico): ${e.message}`));
   }
 
   // ── PICKING (SALIDA_BODEGA / ENTRADA_MERCANCIA) ───────────────────────────
@@ -236,6 +250,7 @@ export class DocumentoUploadService {
     tipo: 'SALIDA_BODEGA' | 'ENTRADA_MERCANCIA',
     empresa: string,
     mapeoColumnas?: Record<string, string>,
+    referenciaSap?: string,
   ): { jobId: string; total: number } {
     const sesion = this.obtenerSesion(uploadId);
     let filas = sesion.resultado.filas;
@@ -248,7 +263,7 @@ export class DocumentoUploadService {
     this.jobs.set(jobId, { estado: 'procesando', progreso: 0, total, creadoEn: new Date() });
 
     const sesionArchivo = sesion._originalname ?? null;
-    this._procesarPickingAsync(jobId, uploadId, tipo, empresa, mapeoColumnas).catch(async err => {
+    this._procesarPickingAsync(jobId, uploadId, tipo, empresa, mapeoColumnas, referenciaSap).catch(async err => {
       const msg: string = err?.message ?? 'Error inesperado';
       this.jobs.set(jobId, { estado: 'error', progreso: 0, total, errorMsg: msg, creadoEn: new Date() });
       this.logger.error(`Job picking ${jobId} falló: ${msg}`);
@@ -266,6 +281,7 @@ export class DocumentoUploadService {
     tipo: 'SALIDA_BODEGA' | 'ENTRADA_MERCANCIA',
     empresa: string,
     mapeoColumnas?: Record<string, string>,
+    referenciaSap?: string,
   ): Promise<void> {
     const sesion = this.obtenerSesion(uploadId);
     const { resultado } = sesion;
@@ -335,7 +351,12 @@ export class DocumentoUploadService {
     }
 
     // Crear y validar el picking en Odoo
-    const origin = `MANUAL-${tipo === 'SALIDA_BODEGA' ? 'GI' : 'GR'}-${Date.now()}`;
+    // Si el usuario proporcionó la referencia SAP, se usa como origen para trazabilidad
+    const prefix = tipo === 'SALIDA_BODEGA' ? 'GI' : 'GR';
+    const refSap = referenciaSap?.trim();
+    const origin = refSap
+      ? `SAP-${prefix}-${refSap}`
+      : `MANUAL-${prefix}-${Date.now()}`;
 
     const pickingResult = await this.odooInventario.crearYValidarPicking({
       origin,

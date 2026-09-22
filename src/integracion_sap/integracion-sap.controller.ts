@@ -14,6 +14,7 @@ import { ProcesarSalidaBodegaUseCase } from './salida-bodega/application/use-cas
 import { ProcesarInventarioInicialUseCase } from './salida-bodega/application/use-cases/procesar-inventario-inicial.use-case';
 import { ProcesarEntradaMercanciaUseCase } from './salida-bodega/application/use-cases/procesar-entrada-mercancia.use-case';
 import { ODOO_CATALOGO_PORT, IOdooCatalogoPort } from './salida-bodega/application/ports/odoo-catalogo.port';
+import { CatalogoItemService } from './documento-parser/catalogo-item.service';
 
 @ApiTags('integracion-sap')
 @Controller('integracion-sap')
@@ -28,6 +29,7 @@ export class IntegracionSapController {
     private readonly procesarUseCase: ProcesarSalidaBodegaUseCase,
     private readonly procesarInventarioUseCase: ProcesarInventarioInicialUseCase,
     private readonly procesarEntradaUseCase: ProcesarEntradaMercanciaUseCase,
+    private readonly catalogoService: CatalogoItemService,
   ) {}
 
   @Get('registros')
@@ -168,5 +170,19 @@ export class IntegracionSapController {
       backlog: (counts['recibido'] ?? 0) + (counts['resuelto_sap'] ?? 0) + (counts['mapeado'] ?? 0),
       porEstado: counts,
     };
+  }
+
+  // ── CATÁLOGO LOCAL DE ITEMS ──────────────────────────────────────────────────
+
+  @Get('catalogo/items')
+  @ApiOperation({ summary: 'Buscar items en el catálogo local (por código o nombre)' })
+  async buscarCatalogo(
+    @Query('q') q?: string,
+    @Query('empresa') empresa = 'DEFAULT',
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit?: number,
+  ) {
+    const items = await this.catalogoService.buscar(empresa, q ?? '', limit);
+    const total = await this.catalogoService.contarActivos(empresa);
+    return { items, total };
   }
 }

@@ -1,1 +1,23 @@
+# dependencies
 node_modules
+
+# build output
+dist
+frontend/.next
+frontend/out
+
+# env files
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+
+# local editor
+.idea
+.vscode

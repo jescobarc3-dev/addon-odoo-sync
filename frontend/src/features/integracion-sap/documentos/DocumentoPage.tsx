@@ -3,7 +3,7 @@ import '@mantine/dropzone/styles.css';
 import {
   Box, Text, Card, Badge, Group, ThemeIcon, Stack, Alert,
   Button, Table, ScrollArea, Select, SimpleGrid, Progress,
-  Stepper, Loader, Anchor,
+  Stepper, Loader, Anchor, TextInput,
 } from '@mantine/core';
 import { Dropzone, MIME_TYPES } from '@mantine/dropzone';
 import {
@@ -51,6 +51,7 @@ interface EstadoUpload {
   headersDisponibles: string[];
   hojas: string[];
   hojaActual: string;
+  docNumSap?: string;
 }
 
 interface ResultadoProcesamiento {
@@ -132,7 +133,9 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
 
   const [uploadState, setUploadState] = useState<EstadoUpload | null>(null);
   const [mapeoActual, setMapeoActual] = useState<Record<string, string>>({});
+  const [referenciaSap, setReferenciaSap] = useState<string>('');
   const [ubicacionOverrideId, setUbicacionOverrideId] = useState<number | null>(null);
+  const [isPdf, setIsPdf] = useState(false);
   const [cargarUbicaciones, setCargarUbicaciones] = useState(false);
   const [resultado, setResultado] = useState<ResultadoProcesamiento | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -178,10 +181,14 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
     setResultado(null);
     setUploadState(null);
     setPasoActivo(0);
+    const filePdf = files[0].type === 'application/pdf' || files[0].name.toLowerCase().endsWith('.pdf');
+    setIsPdf(filePdf);
     try {
       const res = await subirDocumento({ tipo, file: files[0] }).unwrap();
-      setUploadState(res as EstadoUpload);
+      const resTyped = res as EstadoUpload;
+      setUploadState(resTyped);
       setMapeoActual({ ...res.columnasDetectadas });
+      if (resTyped.docNumSap) setReferenciaSap(resTyped.docNumSap);
       setPasoActivo(1);
     } catch (e: any) {
       const msg = e?.data?.message ?? 'Error al procesar el archivo.';
@@ -198,6 +205,7 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
         uploadId: uploadState.uploadId,
         mapeoColumnas: mapeoActual,
         ubicacionOverrideId: ubicacionOverrideId ?? undefined,
+        referenciaSap: esPicking && referenciaSap.trim() ? referenciaSap.trim() : undefined,
       }).unwrap();
       setJobId(res.jobId);
       setJobTotal(res.total);
@@ -225,20 +233,24 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
     setResultado(null);
     setErrorMsg(null);
     setMapeoActual({});
+    setReferenciaSap('');
     setUbicacionOverrideId(null);
     setCargarUbicaciones(false);
+    setIsPdf(false);
     setPasoActivo(0);
     setJobId(null);
     setJobTotal(0);
   }
 
   const whsMapeado = !!mapeoActual['whsCode'];
-  const mapeoIncompleto = CAMPOS_REQUERIDOS
-    .filter(c => {
-      if (c.key === 'whsCode') return !whsMapeado && (esPicking ? true : !ubicacionOverrideId);
-      return c.requerido && !mapeoActual[c.key];
-    })
-    .map(c => c.label);
+  const mapeoIncompleto = isPdf
+    ? []
+    : CAMPOS_REQUERIDOS
+        .filter(c => {
+          if (c.key === 'whsCode') return !whsMapeado && (esPicking ? true : !ubicacionOverrideId);
+          return c.requerido && !mapeoActual[c.key];
+        })
+        .map(c => c.label);
 
   const opciones = uploadState
     ? [SIN_COLUMNA, ...(uploadState.headersDisponibles ?? [])]
@@ -312,141 +324,201 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
       {/* Paso 2: Mapeo + preview */}
       {uploadState && !resultado && (
         <>
-          <Card withBorder p="lg" style={{ background: '#fff' }}>
-            <Group align="center" gap="xs" mb="xs">
-              <IconAdjustments size={18} color={colorAccent} />
-              <Text fw={600} c="#18181B">Confirmar mapeo de columnas</Text>
-            </Group>
-            <Text size="sm" c="#71717A" mb="md">
-              El sistema detectó automáticamente las columnas. Verifica y corrige si es necesario.
-            </Text>
+          {/* Card de mapeo de columnas — solo para Excel/CSV */}
+          {!isPdf && (
+            <Card withBorder p="lg" style={{ background: '#fff' }}>
+              <Group align="center" gap="xs" mb="xs">
+                <IconAdjustments size={18} color={colorAccent} />
+                <Text fw={600} c="#18181B">Confirmar mapeo de columnas</Text>
+              </Group>
+              <Text size="sm" c="#71717A" mb="md">
+                El sistema detectó automáticamente las columnas. Verifica y corrige si es necesario.
+              </Text>
 
-            {/* Selector de hoja */}
-            {(uploadState.hojas?.length ?? 0) > 1 && (
-              <Box mb="md" p="sm" style={{ background: '#F1F5F9', borderRadius: 8, border: '1px solid #E2E8F0' }}>
-                <Group align="center" gap="sm">
-                  <IconBuildingWarehouse size={16} color="#1A365D" />
-                  <Text size="sm" fw={600} c="#1A365D">
-                    {uploadState.hojas.length} hojas — elige cuál procesar:
-                  </Text>
-                </Group>
-                <Select
-                  mt="xs" size="sm"
-                  data={uploadState.hojas}
-                  value={uploadState.hojaActual}
-                  onChange={(val) => val && onCambiarHoja(val)}
-                  disabled={cambiandoHoja}
-                  leftSection={cambiandoHoja ? <Loader size={14} /> : undefined}
-                  styles={{ input: { fontWeight: 600 } }}
-                />
-              </Box>
-            )}
-
-            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
-              {CAMPOS_REQUERIDOS.map(campo => (
-                <Box key={campo.key}>
-                  <Text size="xs" fw={600} c="#52525B" mb={4}>
-                    {campo.label}
-                    {campo.requerido && <Text span c="red"> *</Text>}
-                  </Text>
+              {/* Selector de hoja */}
+              {(uploadState.hojas?.length ?? 0) > 1 && (
+                <Box mb="md" p="sm" style={{ background: '#F1F5F9', borderRadius: 8, border: '1px solid #E2E8F0' }}>
+                  <Group align="center" gap="sm">
+                    <IconBuildingWarehouse size={16} color="#1A365D" />
+                    <Text size="sm" fw={600} c="#1A365D">
+                      {uploadState.hojas.length} hojas — elige cuál procesar:
+                    </Text>
+                  </Group>
                   <Select
-                    data={opciones}
-                    value={mapeoActual[campo.key] ?? SIN_COLUMNA}
-                    onChange={(val) =>
-                      setMapeoActual(prev => ({
-                        ...prev,
-                        [campo.key]: val === SIN_COLUMNA ? '' : (val ?? ''),
-                      }))
-                    }
-                    size="sm"
-                    styles={{
-                      input: {
-                        borderColor: campo.requerido && !mapeoActual[campo.key] ? '#A32D2D' : undefined,
-                      },
-                    }}
+                    mt="xs" size="sm"
+                    data={uploadState.hojas}
+                    value={uploadState.hojaActual}
+                    onChange={(val) => val && onCambiarHoja(val)}
+                    disabled={cambiandoHoja}
+                    leftSection={cambiandoHoja ? <Loader size={14} /> : undefined}
+                    styles={{ input: { fontWeight: 600 } }}
                   />
-                  {mapeoActual[campo.key] && mapeoActual[campo.key] !== SIN_COLUMNA && (
-                    <Text size="10px" c="#0F6E56" mt={2}>
-                      ✓ &quot;{mapeoActual[campo.key]}&quot;
+                </Box>
+              )}
+
+              <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
+                {CAMPOS_REQUERIDOS.map(campo => (
+                  <Box key={campo.key}>
+                    <Text size="xs" fw={600} c="#52525B" mb={4}>
+                      {campo.label}
+                      {campo.requerido && <Text span c="red"> *</Text>}
+                    </Text>
+                    <Select
+                      data={opciones}
+                      value={mapeoActual[campo.key] ?? SIN_COLUMNA}
+                      onChange={(val) =>
+                        setMapeoActual(prev => ({
+                          ...prev,
+                          [campo.key]: val === SIN_COLUMNA ? '' : (val ?? ''),
+                        }))
+                      }
+                      size="sm"
+                      styles={{
+                        input: {
+                          borderColor: campo.requerido && !mapeoActual[campo.key] ? '#A32D2D' : undefined,
+                        },
+                      }}
+                    />
+                    {mapeoActual[campo.key] && mapeoActual[campo.key] !== SIN_COLUMNA && (
+                      <Text size="10px" c="#0F6E56" mt={2}>
+                        ✓ &quot;{mapeoActual[campo.key]}&quot;
+                      </Text>
+                    )}
+                  </Box>
+                ))}
+              </SimpleGrid>
+
+              {mapeoIncompleto.length > 0 && (
+                <Alert icon={<IconAlertTriangle size={14} />} color="red" mt="md" radius="sm">
+                  <Text size="sm">Faltan campos requeridos: <strong>{mapeoIncompleto.join(', ')}</strong></Text>
+                </Alert>
+              )}
+
+              {uploadState.advertencias.length > 0 && (
+                <Alert icon={<IconAlertTriangle size={14} />} color="yellow" mt="sm" radius="sm">
+                  {uploadState.advertencias.map((a, i) => <Text key={i} size="xs">{a}</Text>)}
+                </Alert>
+              )}
+
+              {/* Selector de almacén — sólo para inventario (no para picking) */}
+              {!esPicking && (
+                <Box mt="md" style={{ borderTop: '1px solid #E4E4E7', paddingTop: 16 }}>
+                  <Group align="center" gap="xs" mb={6}>
+                    <IconBuildingWarehouse size={16} color={!whsMapeado ? '#A32D2D' : '#A1A1AA'} />
+                    <Text size="sm" fw={600} c={!whsMapeado ? '#A32D2D' : '#52525B'}>
+                      Almacén de destino
+                      {!whsMapeado && <Text span c="red"> *</Text>}
+                    </Text>
+                  </Group>
+
+                  {whsMapeado ? (
+                    <Text size="xs" c="#0F6E56">
+                      ✓ Se usará la columna &quot;{mapeoActual['whsCode']}&quot; del archivo.
+                    </Text>
+                  ) : (
+                    <>
+                      <Text size="xs" c="#71717A" mb={8}>
+                        Sin columna de almacén. Selecciona uno de Odoo para todas las filas.
+                      </Text>
+                      {!cargarUbicaciones ? (
+                        <Button
+                          variant="outline" size="xs"
+                          leftSection={<IconBuildingWarehouse size={14} />}
+                          onClick={() => setCargarUbicaciones(true)}
+                        >
+                          Cargar almacenes de Odoo
+                        </Button>
+                      ) : (
+                        <Select
+                          placeholder={cargandoUbicaciones ? 'Cargando...' : 'Selecciona un almacén...'}
+                          data={(ubicaciones ?? []).map(u => ({ value: String(u.id), label: u.nombre }))}
+                          value={ubicacionOverrideId ? String(ubicacionOverrideId) : null}
+                          onChange={(val) => setUbicacionOverrideId(val ? Number(val) : null)}
+                          searchable disabled={cargandoUbicaciones} size="sm"
+                          style={{ maxWidth: 400 }}
+                        />
+                      )}
+                      {ubicacionOverrideId && ubicaciones && (
+                        <Text size="xs" c="#0F6E56" mt={4}>
+                          ✓ Todas las filas irán a: <strong>{ubicaciones.find(u => u.id === ubicacionOverrideId)?.nombre}</strong>
+                        </Text>
+                      )}
+                    </>
+                  )}
+                </Box>
+              )}
+
+              {/* Picking: nota sobre mapeo_bodega */}
+              {esPicking && whsMapeado && (
+                <Box mt="md" p="sm" style={{ background: '#F0F9FF', borderRadius: 8, border: '1px solid #BAE6FD' }}>
+                  <Text size="xs" c="#0369A1" fw={600}>
+                    El almacén &quot;{mapeoActual['whsCode']}&quot; se resolverá automáticamente
+                    via Mapeos → Bodegas para obtener el tipo de operación y las ubicaciones de Odoo.
+                  </Text>
+                </Box>
+              )}
+
+              {/* Referencia SAP — solo para picking en Excel/CSV */}
+              {esPicking && (
+                <Box mt="md" style={{ borderTop: '1px solid #E4E4E7', paddingTop: 16 }}>
+                  <TextInput
+                    label="N° de operación SAP"
+                    description="Número de documento SAP. Se usará como referencia en el picking de Odoo."
+                    placeholder="Ej: 12345"
+                    value={referenciaSap}
+                    onChange={(e) => setReferenciaSap(e.currentTarget.value)}
+                    size="sm"
+                    style={{ maxWidth: 320 }}
+                    styles={{ input: { fontWeight: 600, letterSpacing: 1 }, label: { fontWeight: 600 } }}
+                  />
+                  {referenciaSap.trim() && (
+                    <Text size="xs" c="#0F6E56" mt={4}>
+                      ✓ Origin: <strong>SAP-{tipo === 'SALIDA_BODEGA' ? 'GI' : 'GR'}-{referenciaSap.trim()}</strong>
                     </Text>
                   )}
                 </Box>
-              ))}
-            </SimpleGrid>
+              )}
+            </Card>
+          )}
 
-            {mapeoIncompleto.length > 0 && (
-              <Alert icon={<IconAlertTriangle size={14} />} color="red" mt="md" radius="sm">
-                <Text size="sm">Faltan campos requeridos: <strong>{mapeoIncompleto.join(', ')}</strong></Text>
-              </Alert>
-            )}
-
-            {uploadState.advertencias.length > 0 && (
-              <Alert icon={<IconAlertTriangle size={14} />} color="yellow" mt="sm" radius="sm">
-                {uploadState.advertencias.map((a, i) => <Text key={i} size="xs">{a}</Text>)}
-              </Alert>
-            )}
-
-            {/* Selector de almacén — sólo para inventario (no para picking) */}
-            {!esPicking && (
-              <Box mt="md" style={{ borderTop: '1px solid #E4E4E7', paddingTop: 16 }}>
-                <Group align="center" gap="xs" mb={6}>
-                  <IconBuildingWarehouse size={16} color={!whsMapeado ? '#A32D2D' : '#A1A1AA'} />
-                  <Text size="sm" fw={600} c={!whsMapeado ? '#A32D2D' : '#52525B'}>
-                    Almacén de destino
-                    {!whsMapeado && <Text span c="red"> *</Text>}
+          {/* Preview de filas */}
+          <Card withBorder p="lg" style={{ background: '#fff' }}>
+            {/* Para PDF: resumen compacto + campo SAP reference */}
+            {isPdf && (
+              <Box mb="md" p="sm" style={{ background: '#F0F9FF', borderRadius: 8, border: '1px solid #BAE6FD' }}>
+                <Group gap="xs" align="center" mb={esPicking ? 12 : 0}>
+                  <IconCheck size={14} color="#0369A1" />
+                  <Text size="sm" fw={600} c="#0369A1">
+                    PDF procesado automáticamente — {uploadState.totalFilas} líneas
+                    {mapeoActual['whsCode'] ? ` · Almacén: ${mapeoActual['whsCode']}` : ''}
                   </Text>
                 </Group>
-
-                {whsMapeado ? (
-                  <Text size="xs" c="#0F6E56">
-                    ✓ Se usará la columna &quot;{mapeoActual['whsCode']}&quot; del archivo.
-                  </Text>
-                ) : (
-                  <>
-                    <Text size="xs" c="#71717A" mb={8}>
-                      Sin columna de almacén. Selecciona uno de Odoo para todas las filas.
-                    </Text>
-                    {!cargarUbicaciones ? (
-                      <Button
-                        variant="outline" size="xs"
-                        leftSection={<IconBuildingWarehouse size={14} />}
-                        onClick={() => setCargarUbicaciones(true)}
-                      >
-                        Cargar almacenes de Odoo
-                      </Button>
-                    ) : (
-                      <Select
-                        placeholder={cargandoUbicaciones ? 'Cargando...' : 'Selecciona un almacén...'}
-                        data={(ubicaciones ?? []).map(u => ({ value: String(u.id), label: u.nombre }))}
-                        value={ubicacionOverrideId ? String(ubicacionOverrideId) : null}
-                        onChange={(val) => setUbicacionOverrideId(val ? Number(val) : null)}
-                        searchable disabled={cargandoUbicaciones} size="sm"
-                        style={{ maxWidth: 400 }}
-                      />
-                    )}
-                    {ubicacionOverrideId && ubicaciones && (
+                {esPicking && (
+                  <Box mt={4}>
+                    <TextInput
+                      label="N° de operación SAP"
+                      description={
+                        uploadState.docNumSap
+                          ? 'Detectado automáticamente del PDF — puedes corregirlo'
+                          : 'Número de documento SAP. Se usará como referencia en el picking.'
+                      }
+                      placeholder="Ej: 1018167"
+                      value={referenciaSap}
+                      onChange={(e) => setReferenciaSap(e.currentTarget.value)}
+                      size="sm"
+                      style={{ maxWidth: 280 }}
+                      styles={{ input: { fontWeight: 600, letterSpacing: 1 }, label: { fontWeight: 600 } }}
+                    />
+                    {referenciaSap.trim() && (
                       <Text size="xs" c="#0F6E56" mt={4}>
-                        ✓ Todas las filas irán a: <strong>{ubicaciones.find(u => u.id === ubicacionOverrideId)?.nombre}</strong>
+                        ✓ Origin: <strong>SAP-{tipo === 'SALIDA_BODEGA' ? 'GI' : 'GR'}-{referenciaSap.trim()}</strong>
                       </Text>
                     )}
-                  </>
+                  </Box>
                 )}
               </Box>
             )}
 
-            {/* Picking: nota sobre mapeo_bodega */}
-            {esPicking && whsMapeado && (
-              <Box mt="md" p="sm" style={{ background: '#F0F9FF', borderRadius: 8, border: '1px solid #BAE6FD' }}>
-                <Text size="xs" c="#0369A1" fw={600}>
-                  El almacén &quot;{mapeoActual['whsCode']}&quot; se resolverá automáticamente
-                  via Mapeos → Bodegas para obtener el tipo de operación y las ubicaciones de Odoo.
-                </Text>
-              </Box>
-            )}
-          </Card>
-
-          {/* Preview de filas */}
-          <Card withBorder p="lg" style={{ background: '#fff' }}>
             <Group align="center" justify="space-between" mb="sm">
               <Text fw={600} c="#18181B">
                 Vista previa — {uploadState.totalFilas} líneas detectadas
@@ -580,6 +652,14 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
                 <Text size="sm" c="#71717A">
                   Picking ID en Odoo:{' '}
                   <Text span fw={700} c="#1A365D">#{resultado.pickingId}</Text>
+                </Text>
+              )}
+              {referenciaSap.trim() && (
+                <Text size="xs" c="#71717A" mt={2}>
+                  Referencia SAP:{' '}
+                  <Text span fw={600} c="#1A365D" style={{ fontFamily: 'monospace' }}>
+                    SAP-{tipo === 'SALIDA_BODEGA' ? 'GI' : 'GR'}-{referenciaSap.trim()}
+                  </Text>
                 </Text>
               )}
             </Box>

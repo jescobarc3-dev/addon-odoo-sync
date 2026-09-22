@@ -22,6 +22,7 @@ import {
   IconArrowBarDown,
   IconArrowBarUp,
   IconSettings,
+  IconBooks,
 } from '@tabler/icons-react';
 import { DM_Sans } from 'next/font/google';
 
@@ -38,6 +39,7 @@ const NAV_SECTIONS = [
       { href: '/integracion-sap/dashboard', label: 'Dashboard', icon: IconLayoutDashboard },
       { href: '/integracion-sap/cola', label: 'Cola de revisión', icon: IconClipboardList },
       { href: '/integracion-sap/mapeos', label: 'Mapeos', icon: IconTag },
+      { href: '/integracion-sap/catalogo', label: 'Catálogo', icon: IconBooks },
     ],
   },
   {
@@ -55,6 +57,7 @@ const PAGE_LABELS: Record<string, string> = {
   '/integracion-sap/dashboard': 'Dashboard',
   '/integracion-sap/cola': 'Cola de revisión',
   '/integracion-sap/mapeos': 'Mapeos',
+  '/integracion-sap/catalogo': 'Catálogo de artículos',
   '/integracion-sap/documentos/inventario-inicial': 'Inventario inicial',
   '/integracion-sap/documentos/actualizacion': 'Actualización inventario',
   '/integracion-sap/documentos/entradas': 'Entradas de mercancía',

@@ -20,6 +20,8 @@ import { DocumentoUploadController } from './documento-parser/documento-upload.c
 import { ArchivoParserService } from './documento-parser/archivo-parser.service';
 import { DocumentoUploadService } from './documento-parser/documento-upload.service';
 import { HistorialCargaOrmEntity } from './documento-parser/historial-carga.orm-entity';
+import { CatalogoItemOrmEntity } from './documento-parser/catalogo-item.orm-entity';
+import { CatalogoItemService } from './documento-parser/catalogo-item.service';
 import { REGISTRO_SINCRONIZACION_REPOSITORY } from './salida-bodega/domain/repositories/registro-sincronizacion.repository';
 import { MAPEO_ITEM_REPOSITORY } from './salida-bodega/domain/repositories/mapeo-item.repository';
 import { SAP_LECTOR_PORT } from './salida-bodega/application/ports/sap-lector.port';
@@ -36,6 +38,7 @@ import { ODOO_CATALOGO_PORT } from './salida-bodega/application/ports/odoo-catal
       MapeoBodegaOrmEntity,
       OdooConexionOrmEntity,
       HistorialCargaOrmEntity,
+      CatalogoItemOrmEntity,
     ]),
   ],
   controllers: [IntegracionSapController, DocumentoUploadController],
@@ -52,6 +55,7 @@ import { ODOO_CATALOGO_PORT } from './salida-bodega/application/ports/odoo-catal
     SalidaBodegaConsumer,
     OdooCredencialesService,
     ArchivoParserService,
+    CatalogoItemService,
     DocumentoUploadService,
   ],
 })
