@@ -1,0 +1,103 @@
+version: '3.8'
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql://postgres:postgres@postgres:5432/sincronizador_sap
+  RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+  SAP_SQL_HOST: ${SAP_SQL_HOST:-localhost}
+  SAP_SQL_PORT: ${SAP_SQL_PORT:-1433}
+  SAP_SQL_USER: ${SAP_SQL_USER:-sap_reader}
+  SAP_SQL_PASSWORD: ${SAP_SQL_PASSWORD:-changeme}
+  SAP_SQL_DEFAULT_DB: ${SAP_SQL_DEFAULT_DB:-SBODemoDB}
+  ODOO_URL: ${ODOO_URL:-https://bodega.adsa.com.gt}
+  ODOO_DB: ${ODOO_DB:-bodega_pt}
+  ODOO_USER: ${ODOO_USER:-admin}
+  ODOO_PASSWORD: ${ODOO_PASSWORD:-changeme}
+  NODE_ENV: production
+  PORT: 3000
+  ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET:-changeme-replace-in-production}
+  ADMIN_ENCRYPTION_KEY: ${ADMIN_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+  ADMIN_INITIAL_EMAIL: ${ADMIN_INITIAL_EMAIL:-admin@protecciontotal.com.gt}
+  ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:-Admin123!PT}
+  FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4000}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: sincronizador_sap
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./docker/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      <<: *app-env
+      IS_WORKER: "false"
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      <<: *app-env
+      IS_WORKER: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://app:3000
+    environment:
+      PORT: 4000
+    ports:
+      - "4000:4000"
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+  rmq_data:

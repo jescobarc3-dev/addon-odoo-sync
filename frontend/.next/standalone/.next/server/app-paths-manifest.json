@@ -1,0 +1,13 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/integracion-sap/documentos/actualizacion/page": "app/integracion-sap/documentos/actualizacion/page.js",
+  "/integracion-sap/dashboard/page": "app/integracion-sap/dashboard/page.js",
+  "/integracion-sap/documentos/entradas/page": "app/integracion-sap/documentos/entradas/page.js",
+  "/integracion-sap/documentos/inventario-inicial/page": "app/integracion-sap/documentos/inventario-inicial/page.js",
+  "/integracion-sap/cola/page": "app/integracion-sap/cola/page.js",
+  "/integracion-sap/documentos/salidas/page": "app/integracion-sap/documentos/salidas/page.js",
+  "/integracion-sap/mapeos/page": "app/integracion-sap/mapeos/page.js",
+  "/page": "app/page.js",
+  "/admin/configuracion/page": "app/admin/configuracion/page.js",
+  "/admin/login/page": "app/admin/login/page.js"
+}

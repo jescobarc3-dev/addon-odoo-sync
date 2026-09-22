@@ -1,0 +1,178 @@
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+
+export interface RegistroSincronizacion {
+  id: string;
+  empresaCodigo: string;
+  sapDocnum: number;
+  hashPdf: string;
+  estado: string;
+  odooPickingId?: number;
+  odooOrigin?: string;
+  ultimoError?: string;
+  intentos: number;
+  sapDocEntry?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MapeoItem {
+  id: string;
+  empresaCodigo: string;
+  itemCodeSap: string;
+  odooProductId: number;
+  factorUom: number;
+  activo: boolean;
+  notas?: string;
+}
+
+export interface Dashboard {
+  total: number;
+  exitosos: number;
+  errores: number;
+  porcentajeAutomatico: number;
+  backlog: number;
+  porEstado: Record<string, number>;
+}
+
+export const integracionSapApi = createApi({
+  reducerPath: 'integracionSapApi',
+  baseQuery: fetchBaseQuery({ baseUrl: '/api/integracion-sap' }),
+  tagTypes: ['Registro', 'MapeoItem'],
+  endpoints: (builder) => ({
+    getRegistros: builder.query<
+      { items: RegistroSincronizacion[]; total: number },
+      { estado?: string; docnum?: string; page?: number; limit?: number }
+    >({
+      query: (params) => ({ url: '/registros', params }),
+      providesTags: ['Registro'],
+    }),
+    getRegistro: builder.query<RegistroSincronizacion, string>({
+      query: (id) => `/registros/${id}`,
+    }),
+    reprocesar: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/registros/${id}/reprocesar`, method: 'POST' }),
+      invalidatesTags: ['Registro'],
+    }),
+    getMapeoItems: builder.query<MapeoItem[], string | undefined>({
+      query: (empresa) => ({ url: '/mapeos/items', params: empresa ? { empresa } : {} }),
+      providesTags: ['MapeoItem'],
+    }),
+    crearMapeoItem: builder.mutation<MapeoItem, Partial<MapeoItem>>({
+      query: (body) => ({ url: '/mapeos/items', method: 'POST', body }),
+      invalidatesTags: ['MapeoItem'],
+    }),
+    actualizarMapeoItem: builder.mutation<MapeoItem, { id: string; data: Partial<MapeoItem> }>({
+      query: ({ id, data }) => ({ url: `/mapeos/items/${id}`, method: 'PUT', body: data }),
+      invalidatesTags: ['MapeoItem'],
+    }),
+    getDashboard: builder.query<Dashboard, void>({
+      query: () => '/dashboard',
+    }),
+    dispararSalida: builder.mutation<{ ok: boolean }, { docNum: number }>({
+      query: (body) => ({ url: '/salida/disparar', method: 'POST', body }),
+      invalidatesTags: ['Registro'],
+    }),
+    dispararEntrada: builder.mutation<{ ok: boolean }, { docNum: number }>({
+      query: (body) => ({ url: '/entrada/disparar', method: 'POST', body }),
+      invalidatesTags: ['Registro'],
+    }),
+    dispararInventario: builder.mutation<void, { tipo: string }>({
+      query: (body) => ({ url: '/inventario/disparar', method: 'POST', body }),
+    }),
+    subirDocumento: builder.mutation<
+      {
+        uploadId: string;
+        totalFilas: number;
+        advertencias: string[];
+        filas: any[];
+        columnasDetectadas: Record<string, string>;
+        headersDisponibles: string[];
+      },
+      { tipo: string; file: File }
+    >({
+      query: ({ tipo, file }) => {
+        const form = new FormData();
+        form.append('file', file);
+        return { url: `/documentos/${tipo}/upload`, method: 'POST', body: form };
+      },
+    }),
+    procesarDocumento: builder.mutation<
+      { jobId: string; total: number },
+      { tipo: string; uploadId: string; mapeoColumnas?: Record<string, string>; ubicacionOverrideId?: number }
+    >({
+      query: ({ tipo, uploadId, mapeoColumnas, ubicacionOverrideId }) => ({
+        url: `/documentos/${tipo}/procesar/${uploadId}`,
+        method: 'POST',
+        body: { mapeoColumnas, ubicacionOverrideId },
+      }),
+      invalidatesTags: ['Registro'],
+    }),
+    getUbicacionesOdoo: builder.query<{ id: number; nombre: string }[], void>({
+      query: () => '/odoo/ubicaciones',
+    }),
+    getJob: builder.query<
+      {
+        estado: 'procesando' | 'completado' | 'error';
+        progreso: number;
+        total: number;
+        resultado?: {
+          procesados: number; ajustados: number; sinCambio: number; errores: number;
+          detalleErrores: string[]; sinMapeo: string[]; sinBodega: string[]; conOnHandCero: string[];
+        };
+        errorMsg?: string;
+      },
+      { tipo: string; jobId: string }
+    >({
+      query: ({ tipo, jobId }) => `/documentos/${tipo}/job/${jobId}`,
+    }),
+    getHistorial: builder.query<
+      Array<{
+        id: string; tipo: string; nombreArchivo: string | null;
+        totalFilas: number; ajustados: number; sinCambio: number;
+        errores: number; sinBodega: number; conOnHandCero: number;
+        detalleErrores: string[]; sinBodegaLista: string[];
+        estado: string; errorFatal: string | null; creadoEn: string;
+      }>,
+      string
+    >({
+      query: (tipo) => `/documentos/${tipo}/historial`,
+    }),
+    cambiarHoja: builder.mutation<
+      {
+        uploadId: string;
+        totalFilas: number;
+        advertencias: string[];
+        filas: any[];
+        columnasDetectadas: Record<string, string>;
+        headersDisponibles: string[];
+        hojas: string[];
+        hojaActual: string;
+      },
+      { tipo: string; uploadId: string; hoja: string }
+    >({
+      query: ({ tipo, uploadId, hoja }) => ({
+        url: `/documentos/${tipo}/sesion/${uploadId}/hoja`,
+        method: 'POST',
+        body: { hoja },
+      }),
+    }),
+  }),
+});
+
+export const {
+  useGetRegistrosQuery,
+  useReprocesarMutation,
+  useGetMapeoItemsQuery,
+  useCrearMapeoItemMutation,
+  useActualizarMapeoItemMutation,
+  useGetDashboardQuery,
+  useGetUbicacionesOdooQuery,
+  useDispararSalidaMutation,
+  useDispararEntradaMutation,
+  useDispararInventarioMutation,
+  useSubirDocumentoMutation,
+  useProcesarDocumentoMutation,
+  useGetJobQuery,
+  useGetHistorialQuery,
+  useCambiarHojaMutation,
+} = integracionSapApi;
