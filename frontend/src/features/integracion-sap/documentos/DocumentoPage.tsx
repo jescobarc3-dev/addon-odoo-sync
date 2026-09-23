@@ -20,7 +20,10 @@ import {
   useCambiarHojaMutation,
   useGetJobQuery,
   useGetHistorialQuery,
+  useGetMapeosBodegasQuery,
 } from '@/store/api/integracionSapApi';
+import { useGetMeQuery } from '@/store/api/portalApi';
+import { IconLock } from '@tabler/icons-react';
 
 interface Props {
   tipo: string;
@@ -65,7 +68,7 @@ interface ResultadoProcesamiento {
   conOnHandCero: string[];
   // picking
   pickingId?: number;
-  pickingEstado?: 'ok' | 'stock_insuficiente' | 'ya_existe';
+  pickingEstado?: 'ok' | 'ok_sin_stock' | 'ya_existe';
   movesNoAsignados?: string[];
 }
 
@@ -129,12 +132,17 @@ const SIN_COLUMNA = '— sin asignar —';
 
 export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObjeto }: Props) {
   const esPicking = ES_PICKING(tipo);
+  const mostrarPrecio = !esPicking || tipo === 'ENTRADA_MERCANCIA';
   const CAMPOS_REQUERIDOS = esPicking ? CAMPOS_PICKING : CAMPOS_INVENTARIO;
+
+  const { data: me } = useGetMeQuery();
+  const puedeCargar = me?.permisos?.includes('integracion-sap:cargar') || me?.permisos?.includes('admin');
 
   const [uploadState, setUploadState] = useState<EstadoUpload | null>(null);
   const [mapeoActual, setMapeoActual] = useState<Record<string, string>>({});
   const [referenciaSap, setReferenciaSap] = useState<string>('');
   const [ubicacionOverrideId, setUbicacionOverrideId] = useState<number | null>(null);
+  const [whsCodeOverride, setWhsCodeOverride] = useState<string>('');
   const [isPdf, setIsPdf] = useState(false);
   const [cargarUbicaciones, setCargarUbicaciones] = useState(false);
   const [resultado, setResultado] = useState<ResultadoProcesamiento | null>(null);
@@ -163,8 +171,18 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
       setUploadState(null);
       refetchHistorial();
     } else if (job.estado === 'error') {
-      setErrorMsg(job.errorMsg ?? 'Error procesando en el servidor.');
-      setPasoActivo(1);
+      // Si hay resultado (ej: ok_sin_stock con pickingId), mostrarlo
+      if (job.resultado) {
+        setResultado(job.resultado as ResultadoProcesamiento);
+        setPasoActivo(3);
+        setUploadState(null);
+        refetchHistorial();
+      } else {
+        setErrorMsg(job.errorMsg ?? 'Error procesando en el servidor.');
+        setUploadState(null);
+        setPasoActivo(0);
+        refetchHistorial();
+      }
       setJobId(null);
     }
   }, [job]);
@@ -173,6 +191,24 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
     undefined,
     { skip: !cargarUbicaciones || esPicking },
   );
+
+  const tipoOperacionBodega = tipo === 'SALIDA_BODEGA' ? 'SALIDA' : 'ENTRADA';
+  const { data: mapeosBodegas = [] } = useGetMapeosBodegasQuery(undefined, { skip: !esPicking });
+  const bodegasDelTipo = mapeosBodegas.filter(b => b.activo && b.tipoOperacion === tipoOperacionBodega);
+  const opcionesBodega = bodegasDelTipo.map(b => ({ value: b.whsCodeSap, label: b.whsCodeSap }));
+
+  const LS_KEY = `pref_bodega_${tipo}`;
+
+  const leerPreferencia = (opciones: typeof opcionesBodega): string => {
+    const guardado = typeof window !== 'undefined' ? localStorage.getItem(LS_KEY) : null;
+    if (guardado && opciones.some(o => o.value === guardado)) return guardado;
+    if (opciones.length === 1) return opciones[0].value;
+    return '';
+  };
+
+  const guardarPreferencia = (val: string) => {
+    if (typeof window !== 'undefined' && val) localStorage.setItem(LS_KEY, val);
+  };
 
   const pasos = PASOS_DOC[tipo] ?? PASOS_DOC['INVENTARIO_INICIAL'];
 
@@ -189,6 +225,12 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
       setUploadState(resTyped);
       setMapeoActual({ ...res.columnasDetectadas });
       if (resTyped.docNumSap) setReferenciaSap(resTyped.docNumSap);
+      if (filePdf && esPicking) {
+        const opciones = mapeosBodegas
+          .filter(b => b.activo && b.tipoOperacion === tipoOperacionBodega)
+          .map(b => ({ value: b.whsCodeSap, label: b.whsCodeSap }));
+        setWhsCodeOverride(leerPreferencia(opciones));
+      }
       setPasoActivo(1);
     } catch (e: any) {
       const msg = e?.data?.message ?? 'Error al procesar el archivo.';
@@ -199,6 +241,7 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
   async function confirmar() {
     if (!uploadState || jobId) return;
     setErrorMsg(null);
+    if (esPicking && isPdf && whsCodeOverride) guardarPreferencia(whsCodeOverride);
     try {
       const res = await procesarDocumento({
         tipo,
@@ -206,6 +249,7 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
         mapeoColumnas: mapeoActual,
         ubicacionOverrideId: ubicacionOverrideId ?? undefined,
         referenciaSap: esPicking && referenciaSap.trim() ? referenciaSap.trim() : undefined,
+        whsCodeOverride: esPicking && isPdf && whsCodeOverride.trim() ? whsCodeOverride.trim() : undefined,
       }).unwrap();
       setJobId(res.jobId);
       setJobTotal(res.total);
@@ -235,6 +279,7 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
     setMapeoActual({});
     setReferenciaSap('');
     setUbicacionOverrideId(null);
+    setWhsCodeOverride('');
     setCargarUbicaciones(false);
     setIsPdf(false);
     setPasoActivo(0);
@@ -287,8 +332,15 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
         </Group>
       </Card>
 
+      {/* Permiso: cargar */}
+      {!puedeCargar && (
+        <Alert icon={<IconLock size={16} />} color="yellow" title="Sin permiso de carga" mb="md">
+          Tu cuenta no tiene el permiso <strong>integracion-sap:cargar</strong>. Pide a un administrador que te lo asigne en la sección Usuarios.
+        </Alert>
+      )}
+
       {/* Paso 1: Dropzone */}
-      {!uploadState && !resultado && (
+      {puedeCargar && !uploadState && !resultado && (
         <Card withBorder p="lg" style={{ background: '#fff' }}>
           <Text fw={600} mb={8} c="#18181B">Subir archivo exportado de SAP</Text>
           <Dropzone
@@ -486,35 +538,56 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
             {/* Para PDF: resumen compacto + campo SAP reference */}
             {isPdf && (
               <Box mb="md" p="sm" style={{ background: '#F0F9FF', borderRadius: 8, border: '1px solid #BAE6FD' }}>
-                <Group gap="xs" align="center" mb={esPicking ? 12 : 0}>
+                <Group gap="xs" align="center" mb={esPicking ? 12 : 6}>
                   <IconCheck size={14} color="#0369A1" />
                   <Text size="sm" fw={600} c="#0369A1">
                     PDF procesado automáticamente — {uploadState.totalFilas} líneas
-                    {mapeoActual['whsCode'] ? ` · Almacén: ${mapeoActual['whsCode']}` : ''}
                   </Text>
                 </Group>
                 {esPicking && (
-                  <Box mt={4}>
-                    <TextInput
-                      label="N° de operación SAP"
-                      description={
-                        uploadState.docNumSap
-                          ? 'Detectado automáticamente del PDF — puedes corregirlo'
-                          : 'Número de documento SAP. Se usará como referencia en el picking.'
-                      }
-                      placeholder="Ej: 1018167"
-                      value={referenciaSap}
-                      onChange={(e) => setReferenciaSap(e.currentTarget.value)}
-                      size="sm"
-                      style={{ maxWidth: 280 }}
-                      styles={{ input: { fontWeight: 600, letterSpacing: 1 }, label: { fontWeight: 600 } }}
-                    />
-                    {referenciaSap.trim() && (
-                      <Text size="xs" c="#0F6E56" mt={4}>
-                        ✓ Origin: <strong>SAP-{tipo === 'SALIDA_BODEGA' ? 'GI' : 'GR'}-{referenciaSap.trim()}</strong>
-                      </Text>
-                    )}
-                  </Box>
+                  <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm" mt={4}>
+                    <Box>
+                      <Select
+                        label="Almacén SAP"
+                        description={
+                          opcionesBodega.length === 0
+                            ? 'Sin bodegas configuradas — ve a Mapeos → Bodegas'
+                            : 'Selecciona el almacén de origen de esta salida'
+                        }
+                        placeholder="Selecciona un almacén..."
+                        data={opcionesBodega}
+                        value={whsCodeOverride || null}
+                        onChange={(v) => { setWhsCodeOverride(v ?? ''); guardarPreferencia(v ?? ''); }}
+                        size="sm"
+                        required
+                        leftSection={<IconBuildingWarehouse size={14} />}
+                        styles={{ input: { fontWeight: 600, fontFamily: 'monospace' }, label: { fontWeight: 600 } }}
+                        disabled={opcionesBodega.length === 0}
+                        error={!whsCodeOverride ? 'Requerido' : undefined}
+                      />
+                      {whsCodeOverride && (
+                        <Text size="xs" c="#0369A1" mt={3}>
+                          ✓ Usará el mapeo configurado para <strong>{whsCodeOverride}</strong>
+                        </Text>
+                      )}
+                    </Box>
+                    <Box>
+                      <TextInput
+                        label="N° de operación SAP"
+                        description={uploadState.docNumSap ? 'Detectado del PDF — puedes corregirlo' : 'N° documento SAP para la referencia'}
+                        placeholder="Ej: 1018167"
+                        value={referenciaSap}
+                        onChange={(e) => setReferenciaSap(e.currentTarget.value)}
+                        size="sm"
+                        styles={{ input: { fontWeight: 600, letterSpacing: 1 }, label: { fontWeight: 600 } }}
+                      />
+                      {referenciaSap.trim() && (
+                        <Text size="xs" c="#0F6E56" mt={3}>
+                          ✓ Origin: <strong>SAP-{tipo === 'SALIDA_BODEGA' ? 'GI' : 'GR'}-{referenciaSap.trim()}</strong>
+                        </Text>
+                      )}
+                    </Box>
+                  </SimpleGrid>
                 )}
               </Box>
             )}
@@ -539,7 +612,7 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
                     <Table.Th>Descripción</Table.Th>
                     <Table.Th>Almacén</Table.Th>
                     <Table.Th>{labelCantidad}</Table.Th>
-                    {!esPicking && <Table.Th>Costo unit.</Table.Th>}
+                    {mostrarPrecio && <Table.Th>{tipo === 'ENTRADA_MERCANCIA' ? 'Precio' : 'Costo unit.'}</Table.Th>}
                     <Table.Th>UM</Table.Th>
                     <Table.Th>Advertencias</Table.Th>
                   </Table.Tr>
@@ -556,7 +629,7 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
                       <Table.Td><Text size="xs">{fila.itemName}</Text></Table.Td>
                       <Table.Td><Text size="xs">{fila.whsCode}</Text></Table.Td>
                       <Table.Td><Text size="xs" fw={600}>{fila.onHand.toLocaleString('es-GT')}</Text></Table.Td>
-                      {!esPicking && (
+                      {mostrarPrecio && (
                         <Table.Td>
                           <Text size="xs" c={fila.precioUnitario ? '#166534' : '#A1A1AA'}>
                             {fila.precioUnitario != null
@@ -631,22 +704,24 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
       {resultado && esPicking && (
         <Card withBorder p="lg" style={{
           background: '#fff',
-          borderLeft: `4px solid ${resultado.pickingEstado === 'ok' ? '#0F6E56' : resultado.pickingEstado === 'ya_existe' ? '#1A365D' : '#A32D2D'}`,
+          borderLeft: `4px solid ${resultado.pickingEstado === 'ok' ? '#0F6E56' : resultado.pickingEstado === 'ok_sin_stock' ? '#854F0B' : resultado.pickingEstado === 'ya_existe' ? '#1A365D' : '#A32D2D'}`,
         }}>
           <Group align="center" gap="sm" mb="md">
             <ThemeIcon size={36} radius="xl" style={{
-              background: resultado.pickingEstado === 'ok' ? '#0F6E5615' : '#A32D2D15',
+              background: resultado.pickingEstado === 'ok' ? '#0F6E5615' : resultado.pickingEstado === 'ok_sin_stock' ? '#854F0B15' : '#A32D2D15',
             }}>
               {resultado.pickingEstado === 'ok' || resultado.pickingEstado === 'ya_existe'
                 ? <IconCircleCheck size={20} color={resultado.pickingEstado === 'ok' ? '#0F6E56' : '#1A365D'} />
-                : <IconAlertTriangle size={20} color="#A32D2D" />
+                : resultado.pickingEstado === 'ok_sin_stock'
+                  ? <IconCircleCheck size={20} color="#854F0B" />
+                  : <IconAlertTriangle size={20} color="#A32D2D" />
               }
             </ThemeIcon>
             <Box>
               <Text fw={700} c="#18181B">
                 {resultado.pickingEstado === 'ok' && 'Picking creado y validado'}
+                {resultado.pickingEstado === 'ok_sin_stock' && 'Picking validado (sin existencias previas)'}
                 {resultado.pickingEstado === 'ya_existe' && 'Picking ya existía (sin duplicar)'}
-                {resultado.pickingEstado === 'stock_insuficiente' && 'Stock insuficiente — picking en borrador'}
               </Text>
               {resultado.pickingId && (
                 <Text size="sm" c="#71717A">
@@ -658,7 +733,7 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
                 <Text size="xs" c="#71717A" mt={2}>
                   Referencia SAP:{' '}
                   <Text span fw={600} c="#1A365D" style={{ fontFamily: 'monospace' }}>
-                    SAP-{tipo === 'SALIDA_BODEGA' ? 'GI' : 'GR'}-{referenciaSap.trim()}
+                    {referenciaSap.trim()}
                   </Text>
                 </Text>
               )}
@@ -686,14 +761,14 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
             </Card>
           </SimpleGrid>
 
-          {resultado.pickingEstado === 'stock_insuficiente' && (
-            <Alert icon={<IconAlertTriangle size={14} />} color="red" mb="sm" radius="sm">
-              <Text size="sm" fw={600}>Stock insuficiente — picking NO validado (queda en borrador)</Text>
+          {resultado.pickingEstado === 'ok_sin_stock' && (
+            <Alert icon={<IconAlertTriangle size={14} />} color="yellow" mb="sm" radius="sm">
+              <Text size="sm" fw={600}>Validado sin existencias en Odoo — cantidades forzadas desde SAP</Text>
               <Text size="xs" c="#71717A" mt={4}>
-                Moves sin reservar: {resultado.movesNoAsignados?.join(', ')}
+                Productos sin reserva previa: {resultado.movesNoAsignados?.join(', ')}
               </Text>
               <Text size="xs" c="#71717A" mt={4}>
-                El picking #{resultado.pickingId} está en estado &quot;borrador&quot; en Odoo. No se validó para no crear salidas incompletas.
+                El picking está DONE en Odoo. Las existencias quedan negativas hasta que se reciba el ingreso correspondiente.
               </Text>
             </Alert>
           )}

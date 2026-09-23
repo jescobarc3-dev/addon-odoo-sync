@@ -1,7 +1,7 @@
 import {
-  Controller, Get, Post, Put, Param, Body, Query, ParseIntPipe, DefaultValuePipe, Inject,
+  Controller, Get, Post, Put, Delete, Param, Body, Query, ParseIntPipe, DefaultValuePipe, Inject, UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiCookieAuth } from '@nestjs/swagger';
 import {
   IRegistroSincronizacionRepository,
   REGISTRO_SINCRONIZACION_REPOSITORY,
@@ -15,8 +15,12 @@ import { ProcesarInventarioInicialUseCase } from './salida-bodega/application/us
 import { ProcesarEntradaMercanciaUseCase } from './salida-bodega/application/use-cases/procesar-entrada-mercancia.use-case';
 import { ODOO_CATALOGO_PORT, IOdooCatalogoPort } from './salida-bodega/application/ports/odoo-catalogo.port';
 import { CatalogoItemService } from './documento-parser/catalogo-item.service';
+import { JwtPortalGuard } from '../portal/auth/guards/jwt-portal.guard';
+import { PortalPermisosGuard, RequirePermiso } from '../portal/auth/guards/portal-permisos.guard';
 
 @ApiTags('integracion-sap')
+@ApiCookieAuth('portal_token')
+@UseGuards(JwtPortalGuard, PortalPermisosGuard)
 @Controller('integracion-sap')
 export class IntegracionSapController {
   constructor(
@@ -33,6 +37,7 @@ export class IntegracionSapController {
   ) {}
 
   @Get('registros')
+  @RequirePermiso('integracion-sap:read')
   @ApiOperation({ summary: 'Listar registros de sincronización (filtrable por estado/docnum)' })
   async listarRegistros(
     @Query('estado') estado?: string,
@@ -48,12 +53,14 @@ export class IntegracionSapController {
   }
 
   @Get('registros/:id')
+  @RequirePermiso('integracion-sap:read')
   @ApiOperation({ summary: 'Obtener registro por ID' })
   async obtenerRegistro(@Param('id') id: string) {
     return this.registroRepo.findById(id);
   }
 
   @Post('registros/:id/reprocesar')
+  @RequirePermiso('integracion-sap:revisar')
   @ApiOperation({ summary: 'Reprocesar un registro en estado error' })
   async reprocesar(@Param('id') id: string) {
     const reg = await this.registroRepo.findById(id);
@@ -71,30 +78,57 @@ export class IntegracionSapController {
   }
 
   @Get('mapeos/items')
+  @RequirePermiso('integracion-sap:read')
   @ApiOperation({ summary: 'Listar mapeos de items SAP → Odoo' })
   async listarMapeoItems(@Query('empresa') empresa?: string) {
     return this.mapeoRepo.findAllItems(empresa);
   }
 
   @Post('mapeos/items')
+  @RequirePermiso('integracion-sap:mapear')
   @ApiOperation({ summary: 'Crear excepción de mapeo de item' })
   async crearMapeoItem(@Body() body: any) {
     return this.mapeoRepo.saveItem(body);
   }
 
   @Put('mapeos/items/:id')
+  @RequirePermiso('integracion-sap:mapear')
   @ApiOperation({ summary: 'Actualizar mapeo de item' })
   async actualizarMapeoItem(@Param('id') id: string, @Body() body: any) {
     return this.mapeoRepo.updateItem(id, body);
   }
 
   @Get('mapeos/bodegas')
+  @RequirePermiso('integracion-sap:read')
   @ApiOperation({ summary: 'Listar mapeos de bodegas SAP → Odoo' })
   async listarMapeoBodegas(@Query('empresa') empresa?: string) {
     return this.mapeoRepo.findAllBodegas(empresa);
   }
 
+  @Post('mapeos/bodegas')
+  @RequirePermiso('integracion-sap:mapear')
+  @ApiOperation({ summary: 'Crear mapeo de bodega SAP → Odoo' })
+  async crearMapeoBodega(@Body() body: any) {
+    return this.mapeoRepo.saveBodega(body);
+  }
+
+  @Put('mapeos/bodegas/:id')
+  @RequirePermiso('integracion-sap:mapear')
+  @ApiOperation({ summary: 'Actualizar mapeo de bodega' })
+  async actualizarMapeoBodega(@Param('id') id: string, @Body() body: any) {
+    return this.mapeoRepo.updateBodega(id, body);
+  }
+
+  @Delete('mapeos/bodegas/:id')
+  @RequirePermiso('integracion-sap:mapear')
+  @ApiOperation({ summary: 'Eliminar mapeo de bodega' })
+  async eliminarMapeoBodega(@Param('id') id: string) {
+    await this.mapeoRepo.deleteBodega(id);
+    return { ok: true };
+  }
+
   @Post('inventario/disparar')
+  @RequirePermiso('integracion-sap:revisar')
   @ApiOperation({ summary: 'Disparar inventario inicial/actualización manualmente' })
   async dispararInventario(
     @Body() body: { tipo: 'INVENTARIO_INICIAL' | 'ACTUALIZACION_INVENTARIO' },
@@ -110,6 +144,7 @@ export class IntegracionSapController {
   }
 
   @Post('salida/disparar')
+  @RequirePermiso('integracion-sap:revisar')
   @ApiOperation({ summary: 'Procesar una salida de bodega manualmente por DocNum' })
   async dispararSalida(@Body() body: { docNum: number; hashPdf?: string }) {
     const evento = {
@@ -124,6 +159,7 @@ export class IntegracionSapController {
   }
 
   @Post('entrada/disparar')
+  @RequirePermiso('integracion-sap:revisar')
   @ApiOperation({ summary: 'Procesar una entrada de mercancía manualmente por DocNum' })
   async dispararEntrada(@Body() body: { docNum: number; hashPdf?: string }) {
     const evento = {
@@ -138,12 +174,21 @@ export class IntegracionSapController {
   }
 
   @Get('odoo/ubicaciones')
+  @RequirePermiso('integracion-sap:read')
   @ApiOperation({ summary: 'Listar ubicaciones internas de Odoo (stock.location type=internal)' })
   listarUbicaciones() {
     return this.odooCatalogo.listarUbicacionesInternas();
   }
 
+  @Get('odoo/picking-types')
+  @RequirePermiso('integracion-sap:read')
+  @ApiOperation({ summary: 'Listar tipos de operación de Odoo (stock.picking.type)' })
+  listarPickingTypes() {
+    return this.odooCatalogo.listarPickingTypes();
+  }
+
   @Get('dashboard')
+  @RequirePermiso('integracion-sap:read')
   @ApiOperation({ summary: 'Métricas de sincronización' })
   async dashboard() {
     const estados = [
@@ -175,6 +220,7 @@ export class IntegracionSapController {
   // ── CATÁLOGO LOCAL DE ITEMS ──────────────────────────────────────────────────
 
   @Get('catalogo/items')
+  @RequirePermiso('integracion-sap:read')
   @ApiOperation({ summary: 'Buscar items en el catálogo local (por código o nombre)' })
   async buscarCatalogo(
     @Query('q') q?: string,

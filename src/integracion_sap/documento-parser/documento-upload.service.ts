@@ -31,7 +31,7 @@ export interface ResultadoProcesamiento {
   conOnHandCero: string[];
   // Picking-specific (opcional — presente para SALIDA_BODEGA y ENTRADA_MERCANCIA)
   pickingId?: number;
-  pickingEstado?: 'ok' | 'stock_insuficiente' | 'ya_existe';
+  pickingEstado?: 'ok' | 'ok_sin_stock' | 'ya_existe';
   movesNoAsignados?: string[];
 }
 
@@ -251,6 +251,7 @@ export class DocumentoUploadService {
     empresa: string,
     mapeoColumnas?: Record<string, string>,
     referenciaSap?: string,
+    whsCodeOverride?: string,
   ): { jobId: string; total: number } {
     const sesion = this.obtenerSesion(uploadId);
     let filas = sesion.resultado.filas;
@@ -263,7 +264,7 @@ export class DocumentoUploadService {
     this.jobs.set(jobId, { estado: 'procesando', progreso: 0, total, creadoEn: new Date() });
 
     const sesionArchivo = sesion._originalname ?? null;
-    this._procesarPickingAsync(jobId, uploadId, tipo, empresa, mapeoColumnas, referenciaSap).catch(async err => {
+    this._procesarPickingAsync(jobId, uploadId, tipo, empresa, mapeoColumnas, referenciaSap, whsCodeOverride).catch(async err => {
       const msg: string = err?.message ?? 'Error inesperado';
       this.jobs.set(jobId, { estado: 'error', progreso: 0, total, errorMsg: msg, creadoEn: new Date() });
       this.logger.error(`Job picking ${jobId} falló: ${msg}`);
@@ -282,6 +283,7 @@ export class DocumentoUploadService {
     empresa: string,
     mapeoColumnas?: Record<string, string>,
     referenciaSap?: string,
+    whsCodeOverride?: string,
   ): Promise<void> {
     const sesion = this.obtenerSesion(uploadId);
     const { resultado } = sesion;
@@ -301,9 +303,11 @@ export class DocumentoUploadService {
       throw new Error('No hay líneas válidas para crear el picking (sin itemCode).');
     }
 
-    // Usar el primer WhsCode encontrado (una salida SAP = un almacén)
-    const whsCode = filasValidas.find(f => f.whsCode && f.whsCode !== 'DEFAULT')?.whsCode
-      ?? filasValidas[0].whsCode;
+    // Usar el override manual si fue proporcionado (el usuario corrigió el almacén detectado),
+    // si no, tomar el primer WhsCode real de las filas.
+    const whsCode = (whsCodeOverride?.trim())
+      || filasValidas.find(f => f.whsCode && f.whsCode !== 'DEFAULT')?.whsCode
+      || filasValidas[0].whsCode;
 
     // Resolver mapeo_bodega → (pickingTypeId, locationId, locationDestId)
     const mapeoBodega = await this.mapeoRepo.findBodega(empresa, whsCode, tipoBodega);
@@ -333,7 +337,7 @@ export class DocumentoUploadService {
             sinMapeo.push(fila.itemCode);
             return null;
           }
-          return { productId, cantidad: fila.onHand };
+          return { productId, cantidad: fila.onHand, precioUnitario: fila.precioUnitario ?? undefined };
         }),
       );
 
@@ -351,12 +355,10 @@ export class DocumentoUploadService {
     }
 
     // Crear y validar el picking en Odoo
-    // Si el usuario proporcionó la referencia SAP, se usa como origen para trazabilidad
     const prefix = tipo === 'SALIDA_BODEGA' ? 'GI' : 'GR';
     const refSap = referenciaSap?.trim();
-    const origin = refSap
-      ? `SAP-${prefix}-${refSap}`
-      : `MANUAL-${prefix}-${Date.now()}`;
+    // Origin = solo el DocNum (para reportería en Odoo); fallback a timestamp si no hay ref.
+    const origin = refSap ?? `MANUAL-${prefix}-${Date.now()}`;
 
     const pickingResult = await this.odooInventario.crearYValidarPicking({
       origin,
@@ -366,15 +368,9 @@ export class DocumentoUploadService {
       lineas,
     });
 
-    if (pickingResult.tipo === 'stock_insuficiente') {
-      detalleErrores.push(
-        `Stock insuficiente. Moves sin reservar: ${pickingResult.movesNoAsignados.join(', ')}`,
-      );
-    }
-
     const resultadoFinal: ResultadoProcesamiento = {
       procesados: filasValidas.length,
-      ajustados: pickingResult.tipo === 'ok' ? 1 : 0,
+      ajustados: pickingResult.tipo === 'ok' || pickingResult.tipo === 'ok_sin_stock' ? 1 : 0,
       sinCambio: pickingResult.tipo === 'ya_existe' ? 1 : 0,
       errores: detalleErrores.length,
       detalleErrores,
@@ -383,15 +379,13 @@ export class DocumentoUploadService {
       conOnHandCero: [],
       pickingId: 'pickingId' in pickingResult ? pickingResult.pickingId : undefined,
       pickingEstado: pickingResult.tipo,
-      movesNoAsignados: pickingResult.tipo === 'stock_insuficiente'
+      movesNoAsignados: pickingResult.tipo === 'ok_sin_stock'
         ? pickingResult.movesNoAsignados : [],
     };
 
     job.progreso = job.total;
-    job.estado = pickingResult.tipo === 'stock_insuficiente' ? 'error' : 'completado';
+    job.estado = 'completado';
     job.resultado = resultadoFinal;
-    job.errorMsg = pickingResult.tipo === 'stock_insuficiente'
-      ? `Stock insuficiente para: ${pickingResult.movesNoAsignados.join(', ')}` : undefined;
     this.jobs.set(jobId, job);
     this.sesiones.delete(uploadId);
 
@@ -401,8 +395,8 @@ export class DocumentoUploadService {
       `lineas=${lineas.length}`,
     );
     await this._guardarHistorial(tipo, sesion._originalname ?? null, resultadoFinal,
-      pickingResult.tipo === 'stock_insuficiente'
-        ? `Stock insuficiente: ${pickingResult.movesNoAsignados.join(', ')}`
+      pickingResult.tipo === 'ok_sin_stock'
+        ? `Validado sin stock reservado: ${pickingResult.movesNoAsignados.join(', ')}`
         : null,
     );
   }

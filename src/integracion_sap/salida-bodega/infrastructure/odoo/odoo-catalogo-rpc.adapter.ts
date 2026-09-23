@@ -9,6 +9,7 @@ import {
   ResultadoUpsert,
   AjusteInventarioDto,
   UbicacionOdoo,
+  PickingTypeOdoo,
 } from '../../application/ports/odoo-catalogo.port';
 
 type CampoTipo = [string, string | boolean];
@@ -44,7 +45,7 @@ export class OdooCatalogoRpcAdapter implements IOdooCatalogoPort {
     const res = await axios.post(
       `${creds.url}/jsonrpc`,
       { jsonrpc: '2.0', method: 'call', params },
-      { headers: { 'Content-Type': 'application/json' }, timeout: 30000 },
+      { headers: { 'Content-Type': 'application/json' }, timeout: 90000 },
     );
     if (res.data.error) throw new Error(JSON.stringify(res.data.error));
     return res.data.result;
@@ -435,10 +436,26 @@ export class OdooCatalogoRpcAdapter implements IOdooCatalogoPort {
     const result = await this.execute(
       'stock.location',
       'search_read',
-      [[['usage', '=', 'internal'], ['active', '=', true]]],
+      [[['usage', 'in', ['internal', 'supplier', 'customer']], ['active', '=', true]]],
       { fields: ['id', 'complete_name'], order: 'complete_name asc', limit: 200 },
     );
     this._ubicacionesCache = (result ?? []).map((r: any) => ({ id: r.id, nombre: r.complete_name }));
     return this._ubicacionesCache;
+  }
+
+  async listarPickingTypes(): Promise<PickingTypeOdoo[]> {
+    const result = await this.execute(
+      'stock.picking.type',
+      'search_read',
+      [[['active', '=', true]]],
+      { fields: ['id', 'name', 'code', 'default_location_src_id', 'default_location_dest_id'], order: 'name asc', limit: 100 },
+    );
+    return (result ?? []).map((r: any) => ({
+      id: r.id,
+      nombre: r.name,
+      codigo: r.code,
+      defaultLocationSrcId: Array.isArray(r.default_location_src_id) ? r.default_location_src_id[0] : r.default_location_src_id ?? null,
+      defaultLocationDestId: Array.isArray(r.default_location_dest_id) ? r.default_location_dest_id[0] : r.default_location_dest_id ?? null,
+    }));
   }
 }

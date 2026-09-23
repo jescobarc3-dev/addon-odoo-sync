@@ -145,12 +145,10 @@ export class ProcesarSalidaBodegaUseCase {
       } else if (resultado.tipo === 'ya_existe') {
         registro.transicionar('validado_odoo');
         this.logger.log(`ℹ️ DocNum ${docNum} → picking ${resultado.pickingId} ya existía`);
-      } else if (resultado.tipo === 'stock_insuficiente') {
-        registro.transicionar(
-          'error_stock_insuficiente',
-          `Stock insuficiente: ${resultado.movesNoAsignados.join(', ')}`,
-        );
-        this.logger.warn(`⚠️ DocNum ${docNum} → stock insuficiente`);
+      } else if (resultado.tipo === 'ok_sin_stock') {
+        // Validado por immediate transfer — sin stock previo en Odoo
+        registro.transicionar('validado_odoo');
+        this.logger.warn(`⚠️ DocNum ${docNum} → picking ${resultado.pickingId} validado sin stock previo (${resultado.movesNoAsignados.join(', ')})`);
       }
 
       await this.registroRepo.save(registro);

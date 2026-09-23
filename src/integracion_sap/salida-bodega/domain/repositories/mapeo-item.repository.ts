@@ -31,4 +31,7 @@ export interface IMapeoItemRepository {
   updateItem(id: string, data: Partial<MapeoItem>): Promise<MapeoItem>;
   findAllItems(empresaCodigo?: string): Promise<MapeoItem[]>;
   findAllBodegas(empresaCodigo?: string): Promise<MapeoBodega[]>;
+  saveBodega(bodega: Omit<MapeoBodega, 'id'>): Promise<MapeoBodega>;
+  updateBodega(id: string, data: Partial<MapeoBodega>): Promise<MapeoBodega>;
+  deleteBodega(id: string): Promise<void>;
 }

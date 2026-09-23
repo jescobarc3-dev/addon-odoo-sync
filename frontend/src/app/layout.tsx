@@ -4,12 +4,12 @@ import '@mantine/notifications/styles.css';
 import '@mantine/charts/styles.css';
 import '@mantine/dropzone/styles.css';
 import './globals.css';
-import { MantineProvider, Box, Text, Group, Avatar, Divider } from '@mantine/core';
+import { MantineProvider, Box, Text, Group, Avatar, Divider, Menu, UnstyledButton } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import { Provider } from 'react-redux';
 import { store } from '@/store';
 import { theme } from '@/theme';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   IconLayoutDashboard,
@@ -23,8 +23,14 @@ import {
   IconArrowBarUp,
   IconSettings,
   IconBooks,
+  IconLogout,
+  IconExternalLink,
+  IconLink,
+  IconUsers,
 } from '@tabler/icons-react';
 import { DM_Sans } from 'next/font/google';
+import { useGetMeQuery, useLogoutMutation, useGenerarEnlaceMutation } from '@/store/api/portalApi';
+import { notifications } from '@mantine/notifications';
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -40,6 +46,7 @@ const NAV_SECTIONS = [
       { href: '/integracion-sap/cola', label: 'Cola de revisión', icon: IconClipboardList },
       { href: '/integracion-sap/mapeos', label: 'Mapeos', icon: IconTag },
       { href: '/integracion-sap/catalogo', label: 'Catálogo', icon: IconBooks },
+      { href: '/integracion-sap/usuarios', label: 'Usuarios', icon: IconUsers },
     ],
   },
   {
@@ -62,6 +69,8 @@ const PAGE_LABELS: Record<string, string> = {
   '/integracion-sap/documentos/actualizacion': 'Actualización inventario',
   '/integracion-sap/documentos/entradas': 'Entradas de mercancía',
   '/integracion-sap/documentos/salidas': 'Salidas de mercancía',
+  '/integracion-sap/usuarios': 'Gestión de usuarios',
+  '/admin/configuracion': 'Configuración',
 };
 
 function PtLogo() {
@@ -150,6 +159,78 @@ function Sidebar() {
   );
 }
 
+function UserMenu() {
+  const router = useRouter();
+  const { data: me } = useGetMeQuery();
+  const [logout] = useLogoutMutation();
+  const [generarEnlace] = useGenerarEnlaceMutation();
+
+  const iniciales = me?.nombre
+    ? me.nombre.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()
+    : 'PT';
+
+  const handleLogout = async () => {
+    await logout().catch(() => {});
+    router.push('/portal/login');
+  };
+
+  const handleIrOdoo = () => {
+    if (me?.odooUrl) window.open(me.odooUrl, '_blank');
+  };
+
+  const handleCopiarEnlace = async () => {
+    try {
+      const res = await generarEnlace().unwrap();
+      await navigator.clipboard.writeText(res.url);
+      notifications.show({
+        title: 'Enlace copiado',
+        message: `Válido por ${res.expiresEnSegundos / 60} min. Pégalo en Odoo como botón/bookmark.`,
+        color: 'green',
+      });
+    } catch {
+      notifications.show({ title: 'Error', message: 'No se pudo generar el enlace', color: 'red' });
+    }
+  };
+
+  return (
+    <Menu shadow="md" width={220} position="bottom-end">
+      <Menu.Target>
+        <UnstyledButton>
+          <Group gap={8} style={{ cursor: 'pointer' }}>
+            <Avatar size={30} radius="xl" style={{ background: '#8B1A1A' }}>
+              <Text size="xs" fw={700} c="white">{iniciales}</Text>
+            </Avatar>
+            <Box style={{ display: 'none' }} visibleFrom="sm">
+              <Text size="xs" fw={600} c="#18181B" lh={1.2}>{me?.nombre ?? 'Cargando…'}</Text>
+              <Text size="10px" c="#71717A" lh={1}>{me?.email ?? ''}</Text>
+            </Box>
+          </Group>
+        </UnstyledButton>
+      </Menu.Target>
+
+      <Menu.Dropdown>
+        <Menu.Label>
+          {me?.nombre ?? '—'}
+          <Text size="10px" c="#71717A">{me?.email}</Text>
+        </Menu.Label>
+        <Menu.Divider />
+        {me?.odooUrl && (
+          <Menu.Item leftSection={<IconExternalLink size={14} />} onClick={handleIrOdoo}>
+            Ir a Odoo
+          </Menu.Item>
+        )}
+        <Menu.Item leftSection={<IconLink size={14} />} onClick={handleCopiarEnlace}>
+          Copiar enlace de acceso rápido
+        </Menu.Item>
+        <Menu.Divider />
+        <Menu.Item leftSection={<IconLogout size={14} />} color="red" onClick={handleLogout}>
+          Cerrar sesión
+        </Menu.Item>
+      </Menu.Dropdown>
+    </Menu>
+  );
+}
+
 function Header({ path }: { path: string }) {
   const label = Object.entries(PAGE_LABELS).find(([key]) => path.startsWith(key))?.[1] ?? 'Sistema';
   return (
@@ -179,14 +260,7 @@ function Header({ path }: { path: string }) {
           <IconBell size={18} />
         </Box>
         <Divider orientation="vertical" />
-        <Group gap={8}>
-          <Avatar size={30} radius="xl" style={{ background: '#8B1A1A' }}>
-            <Text size="xs" fw={700} c="white">PT</Text>
-          </Avatar>
-          <Box>
-            <Text size="xs" fw={600} c="#18181B" lh={1.2}>Protección Total</Text>
-          </Box>
-        </Group>
+        <UserMenu />
       </Group>
     </Box>
   );
@@ -194,7 +268,7 @@ function Header({ path }: { path: string }) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  if (path.startsWith('/admin')) return <>{children}</>;
+  if (path.startsWith('/admin') || path.startsWith('/portal')) return <>{children}</>;
   return (
     <Box style={{ display: 'flex', minHeight: '100vh' }}>
       <Sidebar />

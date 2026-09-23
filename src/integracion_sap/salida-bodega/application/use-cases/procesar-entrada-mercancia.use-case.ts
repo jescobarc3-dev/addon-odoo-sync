@@ -141,13 +141,10 @@ export class ProcesarEntradaMercanciaUseCase {
       } else if (resultado.tipo === 'ya_existe') {
         registro.transicionar('validado_odoo');
         this.logger.log(`ℹ️ Entrada DocNum ${docNum} → recibo ${resultado.pickingId} ya existía`);
-      } else if (resultado.tipo === 'stock_insuficiente') {
-        // En recepciones esto no debería ocurrir, pero lo capturamos por si Odoo lo reporta
-        registro.transicionar(
-          'error_odoo',
-          `Recibo no se pudo asignar: ${resultado.movesNoAsignados.join(', ')}`,
-        );
-        this.logger.warn(`⚠️ Entrada DocNum ${docNum} → problema de asignación en recibo`);
+      } else if (resultado.tipo === 'ok_sin_stock') {
+        // En recepciones immediate transfer es normal (se recibe sin reserva previa)
+        registro.transicionar('validado_odoo');
+        this.logger.warn(`⚠️ Entrada DocNum ${docNum} → recibo ${resultado.pickingId} con immediate transfer`);
       }
 
       await this.registroRepo.save(registro);

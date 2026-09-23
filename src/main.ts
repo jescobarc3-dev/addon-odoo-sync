@@ -20,18 +20,21 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
   app.setGlobalPrefix('api');
 
-  const config = new DocumentBuilder()
-    .setTitle('Sincronizador SAP → Odoo')
-    .setDescription('Réplica de salidas de inventario SAP → Odoo stock.picking')
-    .setVersion('0.1.0')
-    .addCookieAuth('admin_token')
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('Sincronizador SAP → Odoo')
+      .setDescription('Réplica de salidas de inventario SAP → Odoo stock.picking')
+      .setVersion('0.1.0')
+      .addCookieAuth('admin_token')
+      .addCookieAuth('portal_token')
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+    console.log(`Swagger en http://localhost:${process.env.PORT ?? 3000}/api/docs`);
+  }
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
   console.log(`App HTTP corriendo en http://localhost:${port}/api`);
-  console.log(`Swagger en http://localhost:${port}/api/docs`);
 }
 bootstrap();

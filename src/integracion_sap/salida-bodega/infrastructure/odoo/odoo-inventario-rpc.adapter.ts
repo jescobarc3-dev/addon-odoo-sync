@@ -28,7 +28,7 @@ export class OdooInventarioRpcAdapter implements IOdooInventarioPort {
     const res = await axios.post(
       `${creds.url}/jsonrpc`,
       { jsonrpc: '2.0', method: 'call', params },
-      { headers: { 'Content-Type': 'application/json' }, timeout: 30000 },
+      { headers: { 'Content-Type': 'application/json' }, timeout: 90000 },
     );
     if (res.data.error) throw new Error(JSON.stringify(res.data.error));
     return res.data.result;
@@ -87,7 +87,7 @@ export class OdooInventarioRpcAdapter implements IOdooInventarioPort {
     }]);
 
     for (const linea of dto.lineas) {
-      await this.execute('stock.move', 'create', [{
+      const moveVals: Record<string, any> = {
         picking_id: pickingId,
         product_id: linea.productId,
         product_uom_qty: linea.cantidad,
@@ -95,32 +95,70 @@ export class OdooInventarioRpcAdapter implements IOdooInventarioPort {
         name: `Línea SAP`,
         location_id: dto.locationId,
         location_dest_id: dto.locationDestId,
-      }]);
+      };
+      if (linea.precioUnitario != null && linea.precioUnitario > 0) {
+        moveVals.price_unit = linea.precioUnitario;
+      }
+      await this.execute('stock.move', 'create', [moveVals]);
     }
 
     await this.execute('stock.picking', 'action_confirm', [[pickingId]]);
     await this.execute('stock.picking', 'action_assign', [[pickingId]]);
 
+    // Obtener todos los moves con su estado y cantidad demandada
     const moves = await this.execute('stock.move', 'search_read', [[['picking_id', '=', pickingId]]], {
-      fields: ['id', 'state', 'product_id'],
+      fields: ['id', 'state', 'product_id', 'product_uom_qty', 'product_uom', 'location_id', 'location_dest_id'],
     });
 
-    const noAsignados = moves?.filter((m: any) => m.state !== 'assigned') ?? [];
-    if (noAsignados.length > 0) {
-      const nombres = noAsignados.map((m: any) => m.product_id?.[1] ?? m.id);
-      return { tipo: 'stock_insuficiente', pickingId, movesNoAsignados: nombres };
-    }
+    const noAsignados: string[] = [];
 
-    const moveLines = await this.execute('stock.move.line', 'search_read', [[['picking_id', '=', pickingId]]], {
-      fields: ['id'],
-    });
-    if (moveLines?.length) {
-      await this.execute('stock.move.line', 'write', [moveLines.map((ml: any) => ml.id), { picked: true }]);
+    for (const move of (moves ?? [])) {
+      const existingLines = await this.execute('stock.move.line', 'search_read',
+        [[['move_id', '=', move.id]]],
+        { fields: ['id', 'quantity'] },
+      );
+
+      if (move.state === 'assigned' && existingLines?.length) {
+        // Stock reservado — en Odoo 17/18 'quantity' ya contiene la cantidad reservada
+        const qty = existingLines[0].quantity || move.product_uom_qty;
+        await this.execute('stock.move.line', 'write',
+          [existingLines.map((ml: any) => ml.id), { quantity: qty, picked: true }],
+        );
+      } else {
+        // Sin stock reservado — immediate transfer: forzar cantidad demandada
+        const locationId = Array.isArray(move.location_id) ? move.location_id[0] : move.location_id;
+        const locationDestId = Array.isArray(move.location_dest_id) ? move.location_dest_id[0] : move.location_dest_id;
+        const productId = Array.isArray(move.product_id) ? move.product_id[0] : move.product_id;
+        const uomId = Array.isArray(move.product_uom) ? move.product_uom[0] : (move.product_uom ?? 1);
+
+        if (existingLines?.length) {
+          await this.execute('stock.move.line', 'write',
+            [existingLines.map((ml: any) => ml.id), { quantity: move.product_uom_qty, picked: true }],
+          );
+        } else {
+          await this.execute('stock.move.line', 'create', [{
+            move_id: move.id,
+            picking_id: pickingId,
+            product_id: productId,
+            product_uom_id: uomId,
+            location_id: locationId,
+            location_dest_id: locationDestId,
+            quantity: move.product_uom_qty,
+            picked: true,
+          }]);
+        }
+        noAsignados.push(Array.isArray(move.product_id) ? move.product_id[1] : String(move.product_id));
+      }
     }
 
     await this.execute('stock.picking', 'button_validate', [[pickingId]], {
       context: { skip_backorder: true },
     });
+
+    if (noAsignados.length > 0) {
+      this.logger.warn(`Picking ${pickingId}: ${noAsignados.length} moves sin stock — validado por immediate transfer`);
+      return { tipo: 'ok_sin_stock', pickingId, origin: dto.origin, movesNoAsignados: noAsignados };
+    }
 
     return { tipo: 'ok', pickingId, origin: dto.origin };
   }

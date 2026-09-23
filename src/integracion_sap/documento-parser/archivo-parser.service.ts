@@ -262,9 +262,9 @@ export class ArchivoParserService {
     rows.sort((a, b) => a.y - b.y);
     for (const row of rows) row.items.sort((a, b) => a.x - b.x);
 
-    // ── 3. Extraer DocNum del encabezado (ej: "Entrega No. 1018167") ──────────
-    // Busca "No." seguido de dígitos en las primeras filas del reporte
-    const RE_DOCNUM = /n[oºO°]\.?\s*(\d{4,9})/i;
+    // ── 3. Extraer DocNum del encabezado ─────────────────────────────────────
+    // Cubre: "Entrega No. 1018167", "Nota de entrega compras 1012831", etc.
+    const RE_DOCNUM = /(?:n[oºO°]\.?\s*|compras\s+|salida\s+|entrega\s+)(\d{4,9})/i;
     let docNumSap: string | undefined;
     for (let i = 0; i < Math.min(rows.length, 15); i++) {
       const txt = rows[i].items.map(it => it.text).join(' ');
@@ -275,9 +275,9 @@ export class ArchivoParserService {
 
     // ── 4. Detectar fila de cabecera ─────────────────────────────────────────
     const HEADER_KEYS: Record<string, string[]> = {
-      itemCode: ['codigo', 'articulo', 'cod', 'item', 'referencia', 'sku'],
+      itemCode: ['codigo', 'articulo', 'cod', 'item', 'referencia', 'sku', 'numero', 'nro', 'n°'],
       itemName: ['descripcion', 'nombre', 'detalle'],
-      onHand:   ['cantidad', 'ctd', 'qty', 'existencia'],
+      onHand:   ['cantidad', 'qty', 'existencia'],
       uomCode:  ['u.m', 'uom', 'unidad', 'medida'],
       whsCode:  ['almacen', 'bodega', 'deposito', 'warehouse'],
       precioUnitario: ['precio', 'costo', 'p.u', 'valor unit'],
@@ -286,12 +286,18 @@ export class ArchivoParserService {
     let headerIdx = -1;
     // Posición X de cada columna según el texto del HEADER (puede estar centrado)
     const headerColX: Array<{ field: string; x: number }> = [];
+    // Posición X de la columna de numeración "#" (a excluir de datos)
+    let lineNumColX: number | null = null;
 
     for (let i = 0; i < rows.length; i++) {
       const rowNorm = rows[i].items.map(it => ({ x: it.x, n: normalizar(it.text), raw: it.text }));
       let hits = 0;
       const detected: Array<{ field: string; x: number }> = [];
       const usedItemIndices = new Set<number>();
+
+      // Detectar columna "#" de numeración
+      const hashIdx = rowNorm.findIndex(it => it.raw.trim() === '#');
+      if (hashIdx >= 0) lineNumColX = rowNorm[hashIdx].x;
 
       for (const [field, kws] of Object.entries(HEADER_KEYS)) {
         for (const kw of kws) {
@@ -317,6 +323,35 @@ export class ArchivoParserService {
       }
     }
 
+    // ── 4b. Cabecera multi-fila ────────────────────────────────────────────────
+    // SAP Crystal Reports parte el texto del encabezado en filas muy cercanas (≤25px).
+    // Continuar si falta itemCode, itemName, o si el "#" de líneas no fue detectado.
+    if (headerIdx >= 0 && headerIdx + 1 < rows.length) {
+      const missingFields = Object.keys(HEADER_KEYS).filter(f => !headerColX.find(h => h.field === f));
+      if (missingFields.includes('itemCode') || missingFields.includes('itemName') || lineNumColX === null) {
+        const hY = rows[headerIdx].y;
+        const nextRow = rows[headerIdx + 1];
+        if (nextRow.y - hY < 25) {
+          for (const item of nextRow.items) {
+            const n = normalizar(item.text);
+            // Detectar "#" de numeración en fila de continuación
+            if (item.text.trim() === '#') { lineNumColX = item.x; continue; }
+            for (const field of missingFields) {
+              if (HEADER_KEYS[field].some(kw => n.includes(kw))) {
+                if (!headerColX.find(h => h.field === field)) {
+                  headerColX.push({ field, x: item.x });
+                }
+                break;
+              }
+            }
+          }
+          // La fila de continuación es parte del encabezado — los datos empiezan después
+          this.logger.log(`PDF header multi-fila: continuación en fila ${headerIdx + 1}`);
+          headerIdx = headerIdx + 1;
+        }
+      }
+    }
+
     const advertencias: string[] = [];
 
     if (headerIdx < 0) {
@@ -327,15 +362,15 @@ export class ArchivoParserService {
     this.logger.log(`PDF header fila ${headerIdx}: ${rows[headerIdx].items.map(it => `"${it.text}"@x${it.x}`).join(' | ')}`);
 
     // ── 5. Construir bandas de columna ────────────────────────────────────────
-    // Crystal Reports CENTRA el texto del header pero los datos empiezan en el
-    // borde izquierdo. Usar el punto medio entre columnas como frontera de banda,
-    // en vez de header_X ± tolerancia (que fallaría por el offset de centrado).
+    // Cada banda ocupa desde el x del PROPIO header hasta el x del header SIGUIENTE
+    // (exclusivo). Esto captura datos numéricos desplazados a la derecha del header
+    // (Crystal Reports alinea números a la derecha dentro de la columna).
     headerColX.sort((a, b) => a.x - b.x);
 
     const bands: Array<{ field: string; minX: number; maxX: number }> = headerColX.map((col, i) => ({
       field: col.field,
-      minX: i === 0 ? -Infinity : (headerColX[i - 1].x + col.x) / 2,
-      maxX: i === headerColX.length - 1 ? Infinity : (col.x + headerColX[i + 1].x) / 2,
+      minX: i === 0 ? -Infinity : col.x,
+      maxX: i === headerColX.length - 1 ? Infinity : headerColX[i + 1].x,
     }));
 
     const assignBand = (item: TxtItem): string | null => {
@@ -402,8 +437,10 @@ export class ArchivoParserService {
       // Asignar ítems a columnas por banda
       const cells: Record<string, string[]> = {};
       for (const item of row.items) {
-        // Ignorar columna de numeración de líneas: leftmost (<20px) + entero pequeño
-        if (item.x < 20 && /^\d{1,3}$/.test(item.text.trim())) continue;
+        // Ignorar columna de numeración de líneas (#): número entero pequeño en la columna del "#"
+        const isLineNum = /^\d{1,3}$/.test(item.text.trim()) &&
+          (lineNumColX !== null ? Math.abs(item.x - lineNumColX) < 15 : item.x < 20);
+        if (isLineNum) continue;
 
         const field = assignBand(item);
         if (field) {
@@ -416,11 +453,19 @@ export class ArchivoParserService {
       // SAP item codes: alfanumérico con guiones/puntos, mínimo 2 chars
       if (!itemCode || !/^[A-Z0-9][A-Z0-9\-_.]{1,}/i.test(itemCode)) continue;
 
-      const cantStr = (cells['onHand'] ?? []).join('').replace(/\s/g, '');
-      const onHand = parseNumero(cantStr);
+      // Cantidad: primer valor sin prefijo de moneda (en Crystal Reports precio y qty
+      // pueden caer en la misma banda cuando datos están desplazados vs. encabezado).
+      const RE_MONEDA = /^[A-Z]{2,3}\s+[\d.,]/i;
+      const onHandCells = cells['onHand'] ?? [];
+      const onHand = onHandCells
+        .filter(s => !RE_MONEDA.test(s.trim()))
+        .map(s => parseNumero(s))
+        .find(n => !isNaN(n)) ?? NaN;
       if (isNaN(onHand)) continue;
 
-      const precioRaw = (cells['precioUnitario'] ?? []).join('').trim();
+      // Precio unitario: primer valor con prefijo de moneda en las bandas onHand+precio
+      const precioCandidatos = [...onHandCells, ...(cells['precioUnitario'] ?? [])];
+      const precioRaw = precioCandidatos.find(s => RE_MONEDA.test(s.trim())) ?? '';
       const precio = precioRaw ? parseNumero(precioRaw) : NaN;
 
       filas.push({

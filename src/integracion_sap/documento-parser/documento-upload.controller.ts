@@ -1,21 +1,25 @@
 import {
   Controller, Post, Get, Param, Body, UploadedFile,
-  UseInterceptors, BadRequestException,
+  UseInterceptors, BadRequestException, UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { DocumentoUploadService } from './documento-upload.service';
 import { memoryStorage } from 'multer';
+import { JwtPortalGuard } from '../../portal/auth/guards/jwt-portal.guard';
+import { PortalPermisosGuard, RequirePermiso } from '../../portal/auth/guards/portal-permisos.guard';
 
 const TIPO_VALIDOS = ['INVENTARIO_INICIAL', 'ACTUALIZACION_INVENTARIO', 'SALIDA_BODEGA', 'ENTRADA_MERCANCIA'];
 const MAX_SIZE_MB = 20;
 
 @ApiTags('documento-upload')
 @Controller('integracion-sap/documentos')
+@UseGuards(JwtPortalGuard, PortalPermisosGuard)
 export class DocumentoUploadController {
   constructor(private readonly uploadService: DocumentoUploadService) {}
 
   @Post(':tipo/upload')
+  @RequirePermiso('integracion-sap:cargar')
   @ApiOperation({ summary: 'Subir archivo Excel/CSV/PDF y obtener preview de las filas' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -47,6 +51,7 @@ export class DocumentoUploadController {
   }
 
   @Post(':tipo/sesion/:uploadId/hoja')
+  @RequirePermiso('integracion-sap:cargar')
   @ApiOperation({ summary: 'Cambiar hoja activa del Excel sin re-subir el archivo' })
   async cambiarHoja(
     @Param('uploadId') uploadId: string,
@@ -57,11 +62,12 @@ export class DocumentoUploadController {
   }
 
   @Post(':tipo/procesar/:uploadId')
+  @RequirePermiso('integracion-sap:cargar')
   @ApiOperation({ summary: 'Iniciar procesamiento async — retorna jobId inmediatamente' })
   async procesar(
     @Param('tipo') tipo: string,
     @Param('uploadId') uploadId: string,
-    @Body() body: { mapeoColumnas?: Record<string, string>; ubicacionOverrideId?: number; empresa?: string; referenciaSap?: string },
+    @Body() body: { mapeoColumnas?: Record<string, string>; ubicacionOverrideId?: number; empresa?: string; referenciaSap?: string; whsCodeOverride?: string },
   ) {
     if (tipo === 'INVENTARIO_INICIAL' || tipo === 'ACTUALIZACION_INVENTARIO') {
       return this.uploadService.iniciarJob(uploadId, body.mapeoColumnas, body.ubicacionOverrideId);
@@ -73,6 +79,7 @@ export class DocumentoUploadController {
         body.empresa ?? 'DEFAULT',
         body.mapeoColumnas,
         body.referenciaSap,
+        body.whsCodeOverride,
       );
     }
     throw new BadRequestException(`Tipo "${tipo}" no soportado aún en este endpoint.`);

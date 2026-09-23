@@ -35,6 +35,6 @@ import { AdminSeederService } from './seeder/admin-seeder.service';
     AdminSeederService,
   ],
   controllers: [AdminAuthController, OdooConfigController],
-  exports: [CryptoService, OdooConfigService, TypeOrmModule],
+  exports: [CryptoService, OdooConfigService, TypeOrmModule, JwtAdminGuard, SuperadminGuard],
 })
 export class AdminModule {}

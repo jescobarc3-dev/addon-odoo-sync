@@ -41,6 +41,7 @@ import { ODOO_CATALOGO_PORT } from './salida-bodega/application/ports/odoo-catal
       CatalogoItemOrmEntity,
     ]),
   ],
+  exports: [OdooCredencialesService],
   controllers: [IntegracionSapController, DocumentoUploadController],
   providers: [
     { provide: REGISTRO_SINCRONIZACION_REPOSITORY, useClass: RegistroSincronizacionTypeormRepository },

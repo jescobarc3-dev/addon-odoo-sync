@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { IntegracionSapModule } from './integracion_sap/integracion-sap.module';
 import { AdminModule } from './admin/admin.module';
+import { PortalModule } from './portal/portal.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { AdminModule } from './admin/admin.module';
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     IntegracionSapModule,
     AdminModule,
+    PortalModule,
   ],
 })
 export class AppModule {}

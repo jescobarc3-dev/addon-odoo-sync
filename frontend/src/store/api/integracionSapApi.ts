@@ -1,4 +1,5 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { createApi } from '@reduxjs/toolkit/query/react';
+import { makeBaseQueryWithReauth } from './baseQueryWithReauth';
 
 export interface RegistroSincronizacion {
   id: string;
@@ -25,6 +26,24 @@ export interface MapeoItem {
   notas?: string;
 }
 
+export interface MapeoBodega {
+  id: string;
+  empresaCodigo: string;
+  whsCodeSap: string;
+  tipoOperacion: 'SALIDA' | 'ENTRADA';
+  odooLocationId: number;
+  odooPickingTypeId: number;
+  odooLocationDestId: number;
+  activo: boolean;
+  notas?: string;
+}
+
+export interface PickingTypeOdoo {
+  id: number;
+  nombre: string;
+  codigo: string;
+}
+
 export interface Dashboard {
   total: number;
   exitosos: number;
@@ -36,8 +55,8 @@ export interface Dashboard {
 
 export const integracionSapApi = createApi({
   reducerPath: 'integracionSapApi',
-  baseQuery: fetchBaseQuery({ baseUrl: '/api/integracion-sap' }),
-  tagTypes: ['Registro', 'MapeoItem', 'Catalogo'],
+  baseQuery: makeBaseQueryWithReauth('/api/integracion-sap'),
+  tagTypes: ['Registro', 'MapeoItem', 'MapeoBodega', 'Catalogo', 'Historial'],
   endpoints: (builder) => ({
     getRegistros: builder.query<
       { items: RegistroSincronizacion[]; total: number },
@@ -98,17 +117,36 @@ export const integracionSapApi = createApi({
     }),
     procesarDocumento: builder.mutation<
       { jobId: string; total: number },
-      { tipo: string; uploadId: string; mapeoColumnas?: Record<string, string>; ubicacionOverrideId?: number; referenciaSap?: string }
+      { tipo: string; uploadId: string; mapeoColumnas?: Record<string, string>; ubicacionOverrideId?: number; referenciaSap?: string; whsCodeOverride?: string }
     >({
-      query: ({ tipo, uploadId, mapeoColumnas, ubicacionOverrideId, referenciaSap }) => ({
+      query: ({ tipo, uploadId, mapeoColumnas, ubicacionOverrideId, referenciaSap, whsCodeOverride }) => ({
         url: `/documentos/${tipo}/procesar/${uploadId}`,
         method: 'POST',
-        body: { mapeoColumnas, ubicacionOverrideId, referenciaSap },
+        body: { mapeoColumnas, ubicacionOverrideId, referenciaSap, whsCodeOverride },
       }),
       invalidatesTags: ['Registro'],
     }),
+    getMapeosBodegas: builder.query<MapeoBodega[], string | undefined>({
+      query: (empresa) => ({ url: '/mapeos/bodegas', params: empresa ? { empresa } : {} }),
+      providesTags: ['MapeoBodega'],
+    }),
+    crearMapeoBodega: builder.mutation<MapeoBodega, Partial<MapeoBodega>>({
+      query: (body) => ({ url: '/mapeos/bodegas', method: 'POST', body }),
+      invalidatesTags: ['MapeoBodega'],
+    }),
+    actualizarMapeoBodega: builder.mutation<MapeoBodega, { id: string; data: Partial<MapeoBodega> }>({
+      query: ({ id, data }) => ({ url: `/mapeos/bodegas/${id}`, method: 'PUT', body: data }),
+      invalidatesTags: ['MapeoBodega'],
+    }),
+    eliminarMapeoBodega: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/mapeos/bodegas/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['MapeoBodega'],
+    }),
     getUbicacionesOdoo: builder.query<{ id: number; nombre: string }[], void>({
       query: () => '/odoo/ubicaciones',
+    }),
+    getPickingTypesOdoo: builder.query<PickingTypeOdoo[], void>({
+      query: () => '/odoo/picking-types',
     }),
     getJob: builder.query<
       {
@@ -136,6 +174,8 @@ export const integracionSapApi = createApi({
       string
     >({
       query: (tipo) => `/documentos/${tipo}/historial`,
+      providesTags: ['Historial'],
+      keepUnusedDataFor: 0,
     }),
     cambiarHoja: builder.mutation<
       {
@@ -172,8 +212,13 @@ export const {
   useGetMapeoItemsQuery,
   useCrearMapeoItemMutation,
   useActualizarMapeoItemMutation,
+  useGetMapeosBodegasQuery,
+  useCrearMapeoBodegaMutation,
+  useActualizarMapeoBodegaMutation,
+  useEliminarMapeoBodegaMutation,
   useGetDashboardQuery,
   useGetUbicacionesOdooQuery,
+  useGetPickingTypesOdooQuery,
   useDispararSalidaMutation,
   useDispararEntradaMutation,
   useDispararInventarioMutation,
