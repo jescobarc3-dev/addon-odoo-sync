@@ -3,7 +3,7 @@ import '@mantine/dropzone/styles.css';
 import {
   Box, Text, Card, Badge, Group, ThemeIcon, Stack, Alert,
   Button, Table, ScrollArea, Select, SimpleGrid, Progress,
-  Stepper, Loader, Anchor, TextInput,
+  Stepper, Loader, Anchor, TextInput, Pagination,
 } from '@mantine/core';
 import { Dropzone, MIME_TYPES } from '@mantine/dropzone';
 import {
@@ -150,6 +150,7 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
   const [pasoActivo, setPasoActivo] = useState(0);
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobTotal, setJobTotal] = useState(0);
+  const [paginaHistorial, setPaginaHistorial] = useState(1);
 
   const [subirDocumento, { isLoading: subiendo }] = useSubirDocumentoMutation();
   const [procesarDocumento, { isLoading: iniciando }] = useProcesarDocumentoMutation();
@@ -330,6 +331,32 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
             </Group>
           </Box>
         </Group>
+      </Card>
+
+      {/* Stepper — flujo de procesamiento */}
+      <Card withBorder p="md" style={{ background: '#fff' }}>
+        <Stepper active={pasoActivo} color={colorAccent} size="sm"
+          styles={{ stepLabel: { fontSize: 13, fontWeight: 600 }, stepDescription: { fontSize: 11 } }}
+        >
+          <Stepper.Step label="Subir archivo" description="Excel / CSV / PDF" loading={subiendo} icon={<IconUpload size={16} />} />
+          <Stepper.Step label="Confirmar mapeo" description="columnas → campos" icon={<IconAdjustments size={16} />} />
+          <Stepper.Step
+            label={esPicking ? 'Crear picking' : 'Enviar a Odoo'}
+            description={pasoActivo === 2 ? `${job?.progreso ?? 0}/${jobTotal}…` : pasos[2]?.sub ?? 'procesando'}
+            loading={pasoActivo === 2 && !!jobId}
+            icon={<IconDatabase size={16} />}
+          />
+          <Stepper.Step
+            label="Completado"
+            description={resultado
+              ? esPicking
+                ? `picking #${resultado.pickingId ?? '—'}`
+                : `${resultado.procesados} procesados`
+              : esPicking ? 'picking validado' : 'inventario actualizado'
+            }
+            icon={<IconCheck size={16} />}
+          />
+        </Stepper>
       </Card>
 
       {/* Permiso: cargar */}
@@ -864,98 +891,91 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
         </Card>
       )}
 
-      {/* Historial */}
-      {(historial?.length ?? 0) > 0 && (
-        <Card withBorder p="lg" style={{ background: '#fff' }}>
-          <Group align="center" gap="xs" mb="md">
-            <IconHistory size={18} color="#52525B" />
-            <Text fw={600} c="#18181B">Historial de cargas</Text>
-            <Badge variant="light" color="gray" size="sm">{historial!.length} últimas</Badge>
-          </Group>
-          <ScrollArea>
-            <Table striped withTableBorder withColumnBorders fz="xs">
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Fecha</Table.Th>
-                  <Table.Th>Archivo</Table.Th>
-                  <Table.Th>Estado</Table.Th>
-                  <Table.Th style={{ textAlign: 'right' }}>Filas</Table.Th>
-                  <Table.Th style={{ textAlign: 'right' }}>Ajustados</Table.Th>
-                  <Table.Th style={{ textAlign: 'right' }}>Errores</Table.Th>
-                  <Table.Th>Detalle</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {historial!.map((h) => (
-                  <Table.Tr key={h.id}>
-                    <Table.Td>
-                      <Text size="xs" style={{ whiteSpace: 'nowrap' }}>
-                        {new Date(h.creadoEn).toLocaleString('es-GT', {
-                          day: '2-digit', month: '2-digit', year: '2-digit',
-                          hour: '2-digit', minute: '2-digit',
-                        })}
-                      </Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <Text size="xs" c="#52525B" style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {h.nombreArchivo ?? '—'}
-                      </Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <Badge size="xs" color={h.estado === 'completado' ? 'green' : 'red'} variant="light">
-                        {h.estado}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}><Text size="xs">{h.totalFilas}</Text></Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>
-                      <Text size="xs" fw={600} c="#166534">{h.ajustados}</Text>
-                    </Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>
-                      <Text size="xs" c={h.errores > 0 ? '#92400E' : '#A1A1AA'}>{h.errores}</Text>
-                    </Table.Td>
-                    <Table.Td>
-                      {h.errorFatal ? (
-                        <Text size="xs" c="red" lineClamp={1}>{h.errorFatal}</Text>
-                      ) : h.detalleErrores.length > 0 ? (
-                        <Text size="xs" c="#92400E" lineClamp={1}>{h.detalleErrores[0]}</Text>
-                      ) : (
-                        <Text size="xs" c="#A1A1AA">—</Text>
-                      )}
-                    </Table.Td>
+      {/* Historial de ejecuciones */}
+      {(historial?.length ?? 0) > 0 && (() => {
+        const PAGE_SIZE = 10;
+        const totalPaginas = Math.ceil(historial!.length / PAGE_SIZE);
+        const pagina = Math.min(paginaHistorial, totalPaginas);
+        const filasPagina = historial!.slice((pagina - 1) * PAGE_SIZE, pagina * PAGE_SIZE);
+        return (
+          <Card withBorder p="lg" style={{ background: '#fff' }}>
+            <Group align="center" gap="xs" mb="md">
+              <IconHistory size={18} color="#52525B" />
+              <Text fw={600} c="#18181B">Historial de ejecuciones</Text>
+              <Badge variant="light" color="gray" size="sm">{historial!.length} registros</Badge>
+            </Group>
+            <ScrollArea>
+              <Table striped withTableBorder withColumnBorders fz="xs">
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Fecha</Table.Th>
+                    <Table.Th>Archivo</Table.Th>
+                    <Table.Th>Estado</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>Filas</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>Ajustados</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>Errores</Table.Th>
+                    <Table.Th>Detalle</Table.Th>
                   </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </ScrollArea>
-        </Card>
-      )}
-
-      {/* Stepper */}
-      <Card withBorder p="lg" style={{ background: '#fff' }}>
-        <Text fw={600} mb="lg" c="#18181B">Flujo de procesamiento</Text>
-        <Stepper active={pasoActivo} color={colorAccent} size="sm"
-          styles={{ stepLabel: { fontSize: 13, fontWeight: 600 }, stepDescription: { fontSize: 11 } }}
-        >
-          <Stepper.Step label="Subir archivo" description="Excel / CSV / PDF" loading={subiendo} icon={<IconUpload size={16} />} />
-          <Stepper.Step label="Confirmar mapeo" description="columnas → campos" icon={<IconAdjustments size={16} />} />
-          <Stepper.Step
-            label={esPicking ? 'Crear picking' : 'Enviar a Odoo'}
-            description={pasoActivo === 2 ? `${job?.progreso ?? 0}/${jobTotal}…` : pasos[2]?.sub ?? 'procesando'}
-            loading={pasoActivo === 2 && !!jobId}
-            icon={<IconDatabase size={16} />}
-          />
-          <Stepper.Step
-            label="Completado"
-            description={resultado
-              ? esPicking
-                ? `picking #${resultado.pickingId ?? '—'}`
-                : `${resultado.procesados} procesados`
-              : esPicking ? 'picking validado' : 'inventario actualizado'
-            }
-            icon={<IconCheck size={16} />}
-          />
-        </Stepper>
-      </Card>
+                </Table.Thead>
+                <Table.Tbody>
+                  {filasPagina.map((h) => (
+                    <Table.Tr key={h.id}>
+                      <Table.Td>
+                        <Text size="xs" style={{ whiteSpace: 'nowrap' }}>
+                          {new Date(h.creadoEn).toLocaleString('es-GT', {
+                            day: '2-digit', month: '2-digit', year: '2-digit',
+                            hour: '2-digit', minute: '2-digit',
+                          })}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="xs" c="#52525B" style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {h.nombreArchivo ?? '—'}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge size="xs" color={h.estado === 'completado' ? 'green' : 'red'} variant="light">
+                          {h.estado}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}><Text size="xs">{h.totalFilas}</Text></Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}>
+                        <Text size="xs" fw={600} c="#166534">{h.ajustados}</Text>
+                      </Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}>
+                        <Text size="xs" c={h.errores > 0 ? '#92400E' : '#A1A1AA'}>{h.errores}</Text>
+                      </Table.Td>
+                      <Table.Td>
+                        {h.errorFatal ? (
+                          <Text size="xs" c="red" lineClamp={1}>{h.errorFatal}</Text>
+                        ) : h.detalleErrores.length > 0 ? (
+                          <Text size="xs" c="#92400E" lineClamp={1}>{h.detalleErrores[0]}</Text>
+                        ) : (
+                          <Text size="xs" c="#A1A1AA">—</Text>
+                        )}
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </ScrollArea>
+            {totalPaginas > 1 && (
+              <Group justify="space-between" align="center" mt="md">
+                <Text size="xs" c="#71717A">
+                  Mostrando {(pagina - 1) * PAGE_SIZE + 1}–{Math.min(pagina * PAGE_SIZE, historial!.length)} de {historial!.length}
+                </Text>
+                <Pagination
+                  total={totalPaginas}
+                  value={pagina}
+                  onChange={setPaginaHistorial}
+                  size="sm"
+                  color="ptSlate"
+                />
+              </Group>
+            )}
+          </Card>
+        );
+      })()}
     </Stack>
   );
 }
