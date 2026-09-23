@@ -49,9 +49,24 @@ export interface Dashboard {
   total: number;
   exitosos: number;
   errores: number;
-  porcentajeAutomatico: number;
-  backlog: number;
-  porEstado: Record<string, number>;
+  porcentajeExito: number;
+  porTipo: Record<string, { total: number; exitosos: number; errores: number }>;
+}
+
+export interface HistorialEntry {
+  id: string;
+  tipo: string;
+  nombreArchivo: string | null;
+  totalFilas: number;
+  ajustados: number;
+  sinCambio: number;
+  errores: number;
+  sinBodega: number;
+  detalleErrores: string[];
+  sinBodegaLista: string[];
+  estado: string;
+  errorFatal: string | null;
+  creadoEn: string;
 }
 
 export const integracionSapApi = createApi({
@@ -86,7 +101,14 @@ export const integracionSapApi = createApi({
       invalidatesTags: ['MapeoItem'],
     }),
     getDashboard: builder.query<Dashboard, void>({
-      query: () => '/dashboard',
+      query: () => '/historial/resumen',
+    }),
+    getHistorialTodos: builder.query<
+      { items: HistorialEntry[]; total: number },
+      { estado?: string; tipo?: string; page?: number; limit?: number }
+    >({
+      query: (params) => ({ url: '/historial/todos', params }),
+      keepUnusedDataFor: 0,
     }),
     dispararSalida: builder.mutation<{ ok: boolean }, { docNum: number }>({
       query: (body) => ({ url: '/salida/disparar', method: 'POST', body }),
@@ -210,6 +232,7 @@ export const integracionSapApi = createApi({
 export const {
   useGetRegistrosQuery,
   useReprocesarMutation,
+  useGetHistorialTodosQuery,
   useGetMapeoItemsQuery,
   useCrearMapeoItemMutation,
   useActualizarMapeoItemMutation,

@@ -453,6 +453,38 @@ export class DocumentoUploadService {
     });
   }
 
+  async listarHistorialTodos(opts: {
+    estado?: string; tipo?: string; page?: number; limit?: number;
+  }): Promise<{ items: HistorialCargaOrmEntity[]; total: number }> {
+    const qb = this.historialRepo.createQueryBuilder('h');
+    if (opts.estado) qb.andWhere('h.estado = :estado', { estado: opts.estado });
+    if (opts.tipo) qb.andWhere('h.tipo = :tipo', { tipo: opts.tipo });
+    qb.orderBy('h.creado_en', 'DESC');
+    const page = opts.page ?? 1;
+    const limit = opts.limit ?? 20;
+    qb.skip((page - 1) * limit).take(limit);
+    const [items, total] = await qb.getManyAndCount();
+    return { items, total };
+  }
+
+  async resumenHistorial(): Promise<{
+    total: number; exitosos: number; errores: number; porcentajeExito: number;
+    porTipo: Record<string, { total: number; exitosos: number; errores: number }>;
+  }> {
+    const tipos = ['SALIDA_BODEGA', 'ENTRADA_MERCANCIA', 'INVENTARIO_INICIAL', 'ACTUALIZACION_INVENTARIO'];
+    const total = await this.historialRepo.count();
+    const exitosos = await this.historialRepo.count({ where: { estado: 'completado' } });
+    const errores = await this.historialRepo.count({ where: { estado: 'error' } });
+    const porTipo: Record<string, { total: number; exitosos: number; errores: number }> = {};
+    for (const tipo of tipos) {
+      const t = await this.historialRepo.count({ where: { tipo } });
+      const e = await this.historialRepo.count({ where: { tipo, estado: 'completado' } });
+      const err = await this.historialRepo.count({ where: { tipo, estado: 'error' } });
+      porTipo[tipo] = { total: t, exitosos: e, errores: err };
+    }
+    return { total, exitosos, errores, porcentajeExito: total > 0 ? Math.round((exitosos / total) * 100) : 0, porTipo };
+  }
+
   private limpiar() {
     const now = Date.now();
     for (const [id, sesion] of this.sesiones.entries()) {

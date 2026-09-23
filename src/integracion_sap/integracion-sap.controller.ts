@@ -15,6 +15,7 @@ import { ProcesarInventarioInicialUseCase } from './salida-bodega/application/us
 import { ProcesarEntradaMercanciaUseCase } from './salida-bodega/application/use-cases/procesar-entrada-mercancia.use-case';
 import { ODOO_CATALOGO_PORT, IOdooCatalogoPort } from './salida-bodega/application/ports/odoo-catalogo.port';
 import { CatalogoItemService } from './documento-parser/catalogo-item.service';
+import { DocumentoUploadService } from './documento-parser/documento-upload.service';
 import { JwtPortalGuard } from '../portal/auth/guards/jwt-portal.guard';
 import { PortalPermisosGuard, RequirePermiso } from '../portal/auth/guards/portal-permisos.guard';
 
@@ -34,6 +35,7 @@ export class IntegracionSapController {
     private readonly procesarInventarioUseCase: ProcesarInventarioInicialUseCase,
     private readonly procesarEntradaUseCase: ProcesarEntradaMercanciaUseCase,
     private readonly catalogoService: CatalogoItemService,
+    private readonly uploadService: DocumentoUploadService,
   ) {}
 
   @Get('registros')
@@ -187,34 +189,30 @@ export class IntegracionSapController {
     return this.odooCatalogo.listarPickingTypes();
   }
 
+  @Get('historial/resumen')
+  @RequirePermiso('integracion-sap:read')
+  @ApiOperation({ summary: 'Resumen de métricas de cargas manuales (historial_carga_inventario)' })
+  async historialResumen() {
+    return this.uploadService.resumenHistorial();
+  }
+
+  @Get('historial/todos')
+  @RequirePermiso('integracion-sap:read')
+  @ApiOperation({ summary: 'Todas las cargas manuales (filtrable por estado/tipo, paginado)' })
+  async historialTodos(
+    @Query('estado') estado?: string,
+    @Query('tipo') tipo?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page?: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit?: number,
+  ) {
+    return this.uploadService.listarHistorialTodos({ estado, tipo, page, limit });
+  }
+
   @Get('dashboard')
   @RequirePermiso('integracion-sap:read')
-  @ApiOperation({ summary: 'Métricas de sincronización' })
+  @ApiOperation({ summary: 'Métricas de cargas — alias de historial/resumen' })
   async dashboard() {
-    const estados = [
-      'recibido', 'resuelto_sap', 'mapeado', 'creado_odoo', 'validado_odoo',
-      'error_sap', 'error_mapeo', 'error_stock_insuficiente', 'error_odoo',
-    ];
-    const counts: Record<string, number> = {};
-    for (const estado of estados) {
-      const { total } = await this.registroRepo.findAll({ estado }, 1, 1);
-      counts[estado] = total;
-    }
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    const exitosos = counts['validado_odoo'] ?? 0;
-    const errores =
-      (counts['error_sap'] ?? 0) +
-      (counts['error_mapeo'] ?? 0) +
-      (counts['error_stock_insuficiente'] ?? 0) +
-      (counts['error_odoo'] ?? 0);
-    return {
-      total,
-      exitosos,
-      errores,
-      porcentajeAutomatico: total > 0 ? Math.round((exitosos / total) * 100) : 0,
-      backlog: (counts['recibido'] ?? 0) + (counts['resuelto_sap'] ?? 0) + (counts['mapeado'] ?? 0),
-      porEstado: counts,
-    };
+    return this.uploadService.resumenHistorial();
   }
 
   // ── CATÁLOGO LOCAL DE ITEMS ──────────────────────────────────────────────────
