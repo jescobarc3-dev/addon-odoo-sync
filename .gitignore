@@ -18,6 +18,9 @@ npm-debug.log*
 # OS
 .DS_Store
 
+# TypeScript build cache
+*.tsbuildinfo
+
 # local editor
 .idea
 .vscode
