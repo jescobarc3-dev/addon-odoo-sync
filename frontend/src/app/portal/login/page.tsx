@@ -31,11 +31,9 @@ function LoginForm() {
       await login(values).unwrap();
       router.push(redirect);
     } catch (err: any) {
-      const msg = err?.data?.message ?? 'Credenciales inválidas';
-      if (msg.includes('desactivado')) {
-        form.setErrors({ email: 'Tu cuenta está desactivada. Contacta al administrador.' });
-      } else if (msg.includes('Odoo')) {
-        form.setErrors({ password: msg });
+      const msg = err?.data?.message ?? '';
+      if (msg.includes('contactar')) {
+        form.setErrors({ password: 'No se pudo conectar con el servidor. Intenta de nuevo.' });
       } else {
         form.setErrors({ password: 'Credenciales inválidas' });
       }
@@ -106,8 +104,8 @@ function LoginForm() {
           <Stack gap="md">
             <TextInput
               label="Correo Odoo"
-              placeholder="usuario@protecciontotal.com.gt"
-              autoComplete="username"
+              placeholder="usuario@empresa.com"
+              autoComplete="off"
               styles={{
                 label: { color: '#888', fontSize: 12 },
                 input: { background: '#111', border: '1px solid #2a2a2a', color: '#fff' },
@@ -117,7 +115,7 @@ function LoginForm() {
             <PasswordInput
               label="Contraseña Odoo"
               placeholder="••••••••"
-              autoComplete="current-password"
+              autoComplete="new-password"
               styles={{
                 label: { color: '#888', fontSize: 12 },
                 input: { background: '#111', border: '1px solid #2a2a2a', color: '#fff' },

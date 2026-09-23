@@ -67,7 +67,8 @@ export class PortalAuthService {
       await this.repo.save(usuario);
       this.logger.log(`Nuevo usuario portal: ${email} (Odoo UID ${uid})`);
     } else if (!usuario.activo) {
-      throw new UnauthorizedException('Usuario desactivado en el portal. Contacta al administrador.');
+      this.logger.warn(`Login rechazado: usuario ${email} (UID ${uid}) está desactivado en el portal`);
+      throw new UnauthorizedException('Credenciales inválidas');
     } else {
       await this.repo.update(usuario.id, {
         nombre: odooUser?.name ?? usuario.nombre,
