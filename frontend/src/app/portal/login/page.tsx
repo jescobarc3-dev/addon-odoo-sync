@@ -103,7 +103,7 @@ function LoginForm() {
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Stack gap="md">
             <TextInput
-              label="Correo Odoo"
+              label="Correo"
               placeholder="usuario@empresa.com"
               autoComplete="off"
               styles={{
@@ -113,7 +113,7 @@ function LoginForm() {
               {...form.getInputProps('email')}
             />
             <PasswordInput
-              label="Contraseña Odoo"
+              label="Contraseña"
               placeholder="••••••••"
               autoComplete="new-password"
               styles={{
@@ -135,7 +135,7 @@ function LoginForm() {
 
             <Alert color="dark" style={{ background: '#111', border: '1px solid #1e1e1e' }} p="xs">
               <Text size="xs" style={{ color: '#444' }}>
-                Usa tus credenciales de Odoo. Máximo 5 intentos por minuto.
+                Máximo 5 intentos por minuto.
               </Text>
             </Alert>
           </Stack>
