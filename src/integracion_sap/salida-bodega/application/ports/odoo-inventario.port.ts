@@ -3,7 +3,8 @@ export const ODOO_INVENTARIO_PORT = Symbol('IOdooInventarioPort');
 export type ResultadoPicking =
   | { tipo: 'ok'; pickingId: number; origin: string }
   | { tipo: 'ok_sin_stock'; pickingId: number; origin: string; movesNoAsignados: string[] }
-  | { tipo: 'ya_existe'; pickingId: number; origin: string };
+  | { tipo: 'ya_existe'; pickingId: number; origin: string }
+  | { tipo: 'stock_insuficiente'; movesNoAsignados: string[] };
 
 export interface LineaPickingOdoo {
   productId: number;
@@ -19,6 +20,7 @@ export interface CrearPickingDto {
   locationId: number;
   locationDestId: number;
   lineas: LineaPickingOdoo[];
+  forzarSinStock?: boolean;
 }
 
 export interface IOdooInventarioPort {

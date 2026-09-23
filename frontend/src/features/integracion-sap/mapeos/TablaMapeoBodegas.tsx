@@ -28,6 +28,7 @@ const emptyForm = {
   odooLocationId: '' as any,
   odooPickingTypeId: '' as any,
   odooLocationDestId: '' as any,
+  forzarSinStock: true,
   notas: '',
 };
 
@@ -61,6 +62,7 @@ export function TablaMapeoBodegas() {
       odooLocationId: b.odooLocationId,
       odooPickingTypeId: b.odooPickingTypeId,
       odooLocationDestId: b.odooLocationDestId,
+      forzarSinStock: b.forzarSinStock ?? true,
       notas: b.notas ?? '',
     });
     setModalOpen(true);
@@ -139,6 +141,11 @@ export function TablaMapeoBodegas() {
                 <th>Tipo operación Odoo</th>
                 <th>Ubicación destino</th>
                 <th>Notas</th>
+                <th style={{ textAlign: 'center' }}>
+                  <Tooltip label="Si está ON: valida el picking aunque no haya stock (inventario queda negativo). Si está OFF: cancela si falta stock." multiline w={260} withArrow>
+                    <span style={{ cursor: 'help', borderBottom: '1px dashed #a1a1aa' }}>Forzar sin stock</span>
+                  </Tooltip>
+                </th>
                 <th style={{ textAlign: 'center' }}>Activo</th>
                 <th></th>
               </tr>
@@ -156,6 +163,16 @@ export function TablaMapeoBodegas() {
                   <td><Text size="xs" c="#3B82F6">{nombrePicking(b.odooPickingTypeId)}</Text></td>
                   <td><Text size="xs" c="#52525B">{nombreUbicacion(b.odooLocationDestId)}</Text></td>
                   <td><Text size="xs" c="#71717A">{b.notas ?? '—'}</Text></td>
+                  <td style={{ textAlign: 'center' }}>
+                    <Tooltip label={b.forzarSinStock ? 'Valida aunque no haya stock (inventario negativo)' : 'Cancela si falta stock'} withArrow>
+                      <Switch
+                        checked={b.forzarSinStock ?? true}
+                        onChange={() => actualizarBodega({ id: b.id, data: { forzarSinStock: !b.forzarSinStock } })}
+                        color="ptAmber"
+                        size="sm"
+                      />
+                    </Tooltip>
+                  </td>
                   <td style={{ textAlign: 'center' }}>
                     <Switch checked={b.activo} onChange={() => handleToggle(b)} color="ptGreen" size="sm" />
                   </td>
@@ -177,7 +194,7 @@ export function TablaMapeoBodegas() {
               ))}
               {bodegas.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '48px 0' }}>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '48px 0' }}>
                     <Stack align="center" gap="xs">
                       <Text c="#A1A1AA" size="sm">Sin bodegas configuradas</Text>
                       <Text c="#A1A1AA" size="xs">Crea un mapeo para que el sistema sepa a qué ubicación de Odoo apunta cada almacén de SAP</Text>
@@ -249,6 +266,15 @@ export function TablaMapeoBodegas() {
             required
             size="sm"
             placeholder="Busca por nombre…"
+          />
+
+          <Switch
+            label="Forzar sin stock"
+            description="ON: valida el picking aunque Odoo no tenga stock (el inventario queda negativo hasta que llegue la entrada). OFF: cancela y reporta error si falta stock."
+            checked={form.forzarSinStock}
+            onChange={(e) => setForm(f => ({ ...f, forzarSinStock: e.currentTarget.checked }))}
+            color="ptAmber"
+            size="sm"
           />
 
           <TextInput

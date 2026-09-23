@@ -366,7 +366,21 @@ export class DocumentoUploadService {
       locationId: mapeoBodega.odooLocationId,
       locationDestId: mapeoBodega.odooLocationDestId,
       lineas,
+      forzarSinStock: mapeoBodega.forzarSinStock,
     });
+
+    if (pickingResult.tipo === 'stock_insuficiente') {
+      const msg = `Stock insuficiente en Odoo para: ${pickingResult.movesNoAsignados.join(', ')}. El picking fue cancelado (bodega configurada para no forzar).`;
+      job.progreso = job.total;
+      job.estado = 'error';
+      job.errorMsg = msg;
+      this.jobs.set(jobId, job);
+      this.sesiones.delete(uploadId);
+      await this._guardarHistorial(tipo, sesion._originalname ?? null,
+        { procesados: filasValidas.length, ajustados: 0, sinCambio: 0, errores: 1,
+          detalleErrores: [msg], sinMapeo, sinBodega, conOnHandCero: [] }, msg);
+      return;
+    }
 
     const resultadoFinal: ResultadoProcesamiento = {
       procesados: filasValidas.length,

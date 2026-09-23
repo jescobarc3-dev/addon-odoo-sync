@@ -58,6 +58,9 @@ export class MapeoBodegaOrmEntity {
   @Column({ name: 'odoo_location_dest_id', type: 'int' })
   odooLocationDestId: number;
 
+  @Column({ name: 'forzar_sin_stock', default: true })
+  forzarSinStock: boolean;
+
   @Column({ default: true })
   activo: boolean;
 

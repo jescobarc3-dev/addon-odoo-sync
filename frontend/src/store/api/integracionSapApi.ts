@@ -34,6 +34,7 @@ export interface MapeoBodega {
   odooLocationId: number;
   odooPickingTypeId: number;
   odooLocationDestId: number;
+  forzarSinStock: boolean;
   activo: boolean;
   notas?: string;
 }

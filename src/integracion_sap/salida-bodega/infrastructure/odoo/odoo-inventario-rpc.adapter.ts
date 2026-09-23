@@ -110,7 +110,21 @@ export class OdooInventarioRpcAdapter implements IOdooInventarioPort {
       fields: ['id', 'state', 'product_id', 'product_uom_qty', 'product_uom', 'location_id', 'location_dest_id'],
     });
 
+    // Identificar moves sin reserva antes de escribir cantidades
     const noAsignados: string[] = [];
+    for (const move of (moves ?? [])) {
+      if (move.state !== 'assigned') {
+        noAsignados.push(Array.isArray(move.product_id) ? move.product_id[1] : String(move.product_id));
+      }
+    }
+
+    // Si hay moves sin stock y forzarSinStock=false: cancelar picking y reportar error
+    const forzar = dto.forzarSinStock !== false; // default true
+    if (noAsignados.length > 0 && !forzar) {
+      this.logger.warn(`Picking ${pickingId}: stock insuficiente para ${noAsignados.join(', ')} — se cancela (forzarSinStock=false)`);
+      await this.execute('stock.picking', 'action_cancel', [[pickingId]]);
+      return { tipo: 'stock_insuficiente', movesNoAsignados: noAsignados };
+    }
 
     for (const move of (moves ?? [])) {
       const existingLines = await this.execute('stock.move.line', 'search_read',
@@ -147,7 +161,6 @@ export class OdooInventarioRpcAdapter implements IOdooInventarioPort {
             picked: true,
           }]);
         }
-        noAsignados.push(Array.isArray(move.product_id) ? move.product_id[1] : String(move.product_id));
       }
     }
 
