@@ -86,9 +86,6 @@ function LoginForm() {
           <Title order={2} style={{ color: '#fff', marginTop: 12, fontSize: 18, letterSpacing: 1 }}>
             PROTECCIÓN TOTAL
           </Title>
-          <Text size="xs" style={{ color: '#555', marginTop: 4, textTransform: 'uppercase', letterSpacing: 2 }}>
-            Integración SAP → Odoo
-          </Text>
         </Box>
 
         {errorParam === 'enlace_invalido' && (
@@ -133,11 +130,6 @@ function LoginForm() {
               Iniciar sesión
             </Button>
 
-            <Alert color="dark" style={{ background: '#111', border: '1px solid #1e1e1e' }} p="xs">
-              <Text size="xs" style={{ color: '#444' }}>
-                Máximo 5 intentos por minuto.
-              </Text>
-            </Alert>
           </Stack>
         </form>
       </Card>
