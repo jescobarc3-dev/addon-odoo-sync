@@ -3,11 +3,6 @@ version: '3.8'
 x-app-env: &app-env
   DATABASE_URL: postgresql://postgres:postgres@postgres:5432/sincronizador_sap
   RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
-  SAP_SQL_HOST: ${SAP_SQL_HOST:-localhost}
-  SAP_SQL_PORT: ${SAP_SQL_PORT:-1433}
-  SAP_SQL_USER: ${SAP_SQL_USER:-sap_reader}
-  SAP_SQL_PASSWORD: ${SAP_SQL_PASSWORD:-changeme}
-  SAP_SQL_DEFAULT_DB: ${SAP_SQL_DEFAULT_DB:-SBODemoDB}
   ODOO_URL: ${ODOO_URL:-https://bodega.adsa.com.gt}
   ODOO_DB: ${ODOO_DB:-bodega_pt}
   ODOO_USER: ${ODOO_USER:-admin}
