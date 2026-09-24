@@ -15,19 +15,22 @@ export class AdminSeederService implements OnApplicationBootstrap {
 
   async onApplicationBootstrap() {
     try {
-      const count = await this.repo.count();
-      if (count > 0) return;
-
       const email = process.env.ADMIN_INITIAL_EMAIL || 'admin@protecciontotal.com.gt';
       const password = process.env.ADMIN_INITIAL_PASSWORD || 'Admin123!PT';
       const hash = await bcrypt.hash(password, 12);
 
-      await this.repo.save(
-        this.repo.create({ email, passwordHash: hash, rol: 'SUPERADMIN' }),
-      );
-      this.logger.log(`Superadmin inicial creado: ${email}`);
+      const existing = await this.repo.findOne({ where: { email } });
+      if (existing) {
+        await this.repo.update(existing.id, { passwordHash: hash });
+        this.logger.log(`Superadmin sincronizado desde env: ${email}`);
+      } else {
+        await this.repo.save(
+          this.repo.create({ email, passwordHash: hash, rol: 'SUPERADMIN' }),
+        );
+        this.logger.log(`Superadmin inicial creado: ${email}`);
+      }
     } catch (e: any) {
-      this.logger.error('No se pudo crear superadmin inicial', e?.message);
+      this.logger.error('No se pudo sincronizar superadmin', e?.message);
     }
   }
 }
