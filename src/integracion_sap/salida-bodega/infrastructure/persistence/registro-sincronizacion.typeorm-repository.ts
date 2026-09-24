@@ -42,7 +42,11 @@ export class RegistroSincronizacionTypeormRepository implements IRegistroSincron
     limit = 20,
   ): Promise<{ items: RegistroSincronizacion[]; total: number }> {
     const qb = this.repo.createQueryBuilder('r');
-    if (filtros.estado) qb.andWhere('r.estado = :estado', { estado: filtros.estado });
+    if (filtros.estado === 'error') {
+      qb.andWhere("r.estado LIKE 'error%'");
+    } else if (filtros.estado) {
+      qb.andWhere('r.estado = :estado', { estado: filtros.estado });
+    }
     if (filtros.docnum) qb.andWhere('r.sapDocnum = :docnum', { docnum: filtros.docnum });
     qb.orderBy('r.createdAt', 'DESC').skip((page - 1) * limit).take(limit);
     const [items, total] = await qb.getManyAndCount();

@@ -7,11 +7,13 @@ export interface RegistroSincronizacion {
   sapDocnum: number;
   hashPdf: string;
   estado: string;
+  origen: string;
   odooPickingId?: number;
   odooOrigin?: string;
   ultimoError?: string;
   intentos: number;
   sapDocEntry?: number;
+  sapDocDate?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -65,6 +67,7 @@ export interface HistorialEntry {
   detalleErrores: string[];
   sinBodegaLista: string[];
   estado: string;
+  origen: string;
   errorFatal: string | null;
   creadoEn: string;
 }
