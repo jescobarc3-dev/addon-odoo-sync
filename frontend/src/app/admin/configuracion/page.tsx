@@ -245,9 +245,14 @@ export default function ConfiguracionPage() {
           </Box>
         </Group>
         <Group gap="xs">
-          <Link href="/integracion-sap/dashboard">
+          <Link href="/admin/usuarios">
             <Button variant="subtle" color="gray" size="xs">
-              ← Sistema
+              Usuarios
+            </Button>
+          </Link>
+          <Link href="/portal/login">
+            <Button variant="subtle" color="gray" size="xs">
+              Ir al portal →
             </Button>
           </Link>
           <Button variant="subtle" color="gray" size="xs" onClick={logout}>
@@ -255,6 +260,28 @@ export default function ConfiguracionPage() {
           </Button>
         </Group>
       </Group>
+
+      {/* Guía de primer acceso */}
+      <Card style={{ background: '#111', border: '1px solid #8B1A1A33', marginBottom: 24 }} p="md" radius="sm">
+        <Text size="xs" style={{ color: '#8B1A1A', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700, marginBottom: 12 }}>
+          Guía de primer acceso
+        </Text>
+        <Stack gap={8}>
+          {[
+            { n: '1', txt: 'Configura la conexión de Odoo aquí abajo y pruébala.' },
+            { n: '2', txt: 'Ve a "Usuarios" (nav arriba) → "Sincronizar desde Odoo" para importar todas las cuentas.' },
+            { n: '3', txt: 'Encuéntrate en la lista → activa tu cuenta → edita permisos y agrégale "admin" (y los demás que necesites).' },
+            { n: '4', txt: 'Haz clic en "Ir al portal →" e ingresa con tus credenciales de Odoo. Eso es todo.' },
+          ].map(({ n, txt }) => (
+            <Group key={n} gap={10} wrap="nowrap">
+              <Box style={{ width: 22, height: 22, borderRadius: '50%', background: '#8B1A1A', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Text size="xs" style={{ color: '#fff', fontWeight: 700, lineHeight: 1 }}>{n}</Text>
+              </Box>
+              <Text size="xs" style={{ color: '#aaa' }}>{txt}</Text>
+            </Group>
+          ))}
+        </Stack>
+      </Card>
 
       {/* Métricas rápidas */}
       <SimpleGrid cols={3} mb={24}>
