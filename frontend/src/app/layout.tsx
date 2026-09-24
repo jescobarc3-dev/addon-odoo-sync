@@ -26,7 +26,6 @@ import {
   IconLogout,
   IconExternalLink,
   IconLink,
-  IconUsers,
 } from '@tabler/icons-react';
 import { DM_Sans } from 'next/font/google';
 import { useGetMeQuery, useLogoutMutation, useGenerarEnlaceMutation } from '@/store/api/portalApi';
@@ -46,7 +45,6 @@ const NAV_SECTIONS = [
       { href: '/integracion-sap/cola', label: 'Cola de revisión', icon: IconClipboardList },
       { href: '/integracion-sap/mapeos', label: 'Mapeos', icon: IconTag },
       { href: '/integracion-sap/catalogo', label: 'Catálogo', icon: IconBooks },
-      { href: '/integracion-sap/usuarios', label: 'Usuarios', icon: IconUsers },
     ],
   },
   {
@@ -69,7 +67,6 @@ const PAGE_LABELS: Record<string, string> = {
   '/integracion-sap/documentos/actualizacion': 'Actualización inventario',
   '/integracion-sap/documentos/entradas': 'Entradas de mercancía',
   '/integracion-sap/documentos/salidas': 'Salidas de mercancía',
-  '/integracion-sap/usuarios': 'Gestión de usuarios',
   '/admin/configuracion': 'Configuración',
 };
 
