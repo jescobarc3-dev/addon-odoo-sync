@@ -2,12 +2,12 @@ import {
   Controller, Get, Put, Post, Body, Param, UseGuards, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { JwtAdminGuard } from '../auth/guards/jwt-admin.guard';
-import { PortalUsuariosService, PERMISOS_DISPONIBLES } from '../../portal/usuarios/portal-usuarios.service';
+import { AdminPortalUsuariosService, PERMISOS_DISPONIBLES } from './admin-portal-usuarios.service';
 
 @Controller('admin/usuarios')
 @UseGuards(JwtAdminGuard)
 export class AdminUsuariosController {
-  constructor(private readonly service: PortalUsuariosService) {}
+  constructor(private readonly service: AdminPortalUsuariosService) {}
 
   @Get()
   listar() {

@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -15,12 +15,12 @@ import { OdooConfigService } from './config/odoo-config.service';
 import { OdooConfigController } from './config/odoo-config.controller';
 import { AdminSeederService } from './seeder/admin-seeder.service';
 import { AdminUsuariosController } from './usuarios/admin-usuarios.controller';
-import { PortalModule } from '../portal/portal.module';
+import { AdminPortalUsuariosService } from './usuarios/admin-portal-usuarios.service';
+import { PortalUsuarioOrmEntity } from '../portal/entities/portal-usuario.orm-entity';
 
 @Module({
   imports: [
-    forwardRef(() => PortalModule),
-    TypeOrmModule.forFeature([AdminUsuarioOrmEntity, OdooConexionOrmEntity]),
+    TypeOrmModule.forFeature([AdminUsuarioOrmEntity, OdooConexionOrmEntity, PortalUsuarioOrmEntity]),
     PassportModule,
     JwtModule.register({
       secret: process.env.ADMIN_JWT_SECRET || 'changeme',
@@ -36,6 +36,7 @@ import { PortalModule } from '../portal/portal.module';
     AdminAuthService,
     OdooConfigService,
     AdminSeederService,
+    AdminPortalUsuariosService,
   ],
   controllers: [AdminAuthController, OdooConfigController, AdminUsuariosController],
   exports: [CryptoService, OdooConfigService, TypeOrmModule, JwtAdminGuard, SuperadminGuard],

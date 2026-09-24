@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -10,12 +10,10 @@ import { JwtPortalGuard } from './auth/guards/jwt-portal.guard';
 import { PortalPermisosGuard } from './auth/guards/portal-permisos.guard';
 import { PortalUsuariosController } from './usuarios/portal-usuarios.controller';
 import { PortalUsuariosService } from './usuarios/portal-usuarios.service';
-import { AdminModule } from '../admin/admin.module';
 import { IntegracionSapModule } from '../integracion_sap/integracion-sap.module';
 
 @Module({
   imports: [
-    forwardRef(() => AdminModule),
     IntegracionSapModule,
     TypeOrmModule.forFeature([PortalUsuarioOrmEntity]),
     PassportModule,
