@@ -55,20 +55,16 @@ export class PortalAuthService {
     let usuario = await this.repo.findOne({ where: { odooUid: uid } });
 
     if (!usuario) {
-      // Primer usuario en el sistema → admin automático
-      const total = await this.repo.count();
-      const permisos = total === 0 ? ['integracion-sap:read', 'integracion-sap:cargar', 'integracion-sap:mapear', 'integracion-sap:revisar', 'admin'] : PERMISOS_DEFAULT;
-
       usuario = this.repo.create({
         odooUid: uid,
         odooLogin: email.toLowerCase().trim(),
         nombre: odooNombre ?? email,
-        permisos,
+        permisos: PERMISOS_DEFAULT,
         activo: true,
         sincronizadoEn: new Date(),
       });
       await this.repo.save(usuario);
-      this.logger.log(`Nuevo usuario portal: ${email} (Odoo UID ${uid})${total === 0 ? ' — asignado como admin' : ''}`);
+      this.logger.log(`Nuevo usuario portal: ${email} (Odoo UID ${uid})`);
     } else if (!usuario.activo) {
       this.logger.warn(`Login rechazado: usuario ${email} está desactivado`);
       throw new UnauthorizedException('Credenciales inválidas');

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -15,7 +15,7 @@ import { IntegracionSapModule } from '../integracion_sap/integracion-sap.module'
 
 @Module({
   imports: [
-    AdminModule,
+    forwardRef(() => AdminModule),
     IntegracionSapModule,
     TypeOrmModule.forFeature([PortalUsuarioOrmEntity]),
     PassportModule,
@@ -32,6 +32,6 @@ import { IntegracionSapModule } from '../integracion_sap/integracion-sap.module'
     PortalUsuariosService,
   ],
   controllers: [PortalAuthController, PortalUsuariosController],
-  exports: [JwtPortalGuard, PortalPermisosGuard, PortalAuthService],
+  exports: [JwtPortalGuard, PortalPermisosGuard, PortalAuthService, PortalUsuariosService],
 })
 export class PortalModule {}

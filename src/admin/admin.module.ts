@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -14,9 +14,12 @@ import { AdminAuthController } from './auth/admin-auth.controller';
 import { OdooConfigService } from './config/odoo-config.service';
 import { OdooConfigController } from './config/odoo-config.controller';
 import { AdminSeederService } from './seeder/admin-seeder.service';
+import { AdminUsuariosController } from './usuarios/admin-usuarios.controller';
+import { PortalModule } from '../portal/portal.module';
 
 @Module({
   imports: [
+    forwardRef(() => PortalModule),
     TypeOrmModule.forFeature([AdminUsuarioOrmEntity, OdooConexionOrmEntity]),
     PassportModule,
     JwtModule.register({
@@ -34,7 +37,7 @@ import { AdminSeederService } from './seeder/admin-seeder.service';
     OdooConfigService,
     AdminSeederService,
   ],
-  controllers: [AdminAuthController, OdooConfigController],
+  controllers: [AdminAuthController, OdooConfigController, AdminUsuariosController],
   exports: [CryptoService, OdooConfigService, TypeOrmModule, JwtAdminGuard, SuperadminGuard],
 })
 export class AdminModule {}
