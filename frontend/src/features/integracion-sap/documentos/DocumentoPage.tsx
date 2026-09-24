@@ -909,6 +909,7 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th>Fecha</Table.Th>
+                    <Table.Th>Origen</Table.Th>
                     <Table.Th>Archivo</Table.Th>
                     <Table.Th>Estado</Table.Th>
                     <Table.Th style={{ textAlign: 'right' }}>Filas</Table.Th>
@@ -927,6 +928,16 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
                             hour: '2-digit', minute: '2-digit',
                           })}
                         </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge
+                          size="xs"
+                          color={(h as any).origen === 'EXT' ? 'violet' : 'gray'}
+                          variant={(h as any).origen === 'EXT' ? 'filled' : 'outline'}
+                          title={(h as any).origen === 'EXT' ? 'Externo — SAP Business One' : 'Interno — carga manual'}
+                        >
+                          {(h as any).origen ?? 'INT'}
+                        </Badge>
                       </Table.Td>
                       <Table.Td>
                         <Text size="xs" c="#52525B" style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

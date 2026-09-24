@@ -94,6 +94,7 @@ export function ColaSincronizacion() {
               <thead>
                 <tr>
                   <th>Fecha</th>
+                  <th>Origen</th>
                   <th>Tipo</th>
                   <th>Archivo</th>
                   <th>Estado</th>
@@ -114,6 +115,16 @@ export function ColaSincronizacion() {
                           hour: '2-digit', minute: '2-digit',
                         })}
                       </Text>
+                    </td>
+                    <td>
+                      <Badge
+                        size="xs"
+                        color={(h as any).origen === 'EXT' ? 'violet' : 'gray'}
+                        variant={(h as any).origen === 'EXT' ? 'filled' : 'outline'}
+                        title={(h as any).origen === 'EXT' ? 'Externo — SAP Business One' : 'Interno — carga manual'}
+                      >
+                        {(h as any).origen ?? 'INT'}
+                      </Badge>
                     </td>
                     <td>
                       <Badge size="xs" color={TIPO_COLOR[h.tipo] ?? 'gray'} variant="light">
@@ -163,7 +174,7 @@ export function ColaSincronizacion() {
                 ))}
                 {!data?.items.length && (
                   <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: '48px 0' }}>
+                    <td colSpan={10} style={{ textAlign: 'center', padding: '48px 0' }}>
                       <Text c="#A1A1AA" size="sm">
                         {estado === 'error' ? 'Sin cargas con error — todo está limpio.' : 'Sin registros para los filtros seleccionados.'}
                       </Text>

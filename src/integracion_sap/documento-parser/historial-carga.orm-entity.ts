@@ -38,6 +38,9 @@ export class HistorialCargaOrmEntity {
   @Column({ name: 'estado', length: 20, default: 'completado' })
   estado: string;
 
+  @Column({ name: 'origen', length: 10, default: 'INT' })
+  origen: string;
+
   @Column({ name: 'error_fatal', type: 'text', nullable: true })
   errorFatal: string | null;
 

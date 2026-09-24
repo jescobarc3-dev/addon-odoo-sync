@@ -38,6 +38,9 @@ export class RegistroSincronizacionOrmEntity {
   @Column({ type: 'smallint', default: 0 })
   intentos: number;
 
+  @Column({ name: 'origen', length: 10, default: 'EXT' })
+  origen: string;
+
   @Column({ name: 'sap_doc_entry', type: 'int', nullable: true })
   sapDocEntry: number;
 

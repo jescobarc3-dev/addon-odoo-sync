@@ -84,6 +84,7 @@ export class OdooInventarioRpcAdapter implements IOdooInventarioPort {
       picking_type_id: dto.pickingTypeId,
       location_id: dto.locationId,
       location_dest_id: dto.locationDestId,
+      note: 'Origen: EXT — SAP Business One (Sincronizador)',
     }]);
 
     for (const linea of dto.lineas) {
