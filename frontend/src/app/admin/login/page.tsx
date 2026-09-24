@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box, Card, TextInput, PasswordInput, Button, Title, Text,
-  PinInput, Collapse, Alert, Stack,
+  PinInput, Collapse, Stack,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
@@ -132,7 +132,7 @@ export default function AdminLoginPage() {
             PROTECCIÓN TOTAL
           </Title>
           <Text size="xs" style={{ color: '#555', marginTop: 4, textTransform: 'uppercase', letterSpacing: 2 }}>
-            Panel de Administración
+            Administración
           </Text>
         </Box>
 
@@ -140,7 +140,7 @@ export default function AdminLoginPage() {
           <Stack gap="md">
             <TextInput
               label="Email"
-              placeholder="admin@protecciontotal.com.gt"
+              placeholder=""
               styles={{
                 label: { color: '#888', fontSize: 12 },
                 input: { background: '#111', border: '1px solid #2a2a2a', color: '#fff' },
@@ -149,7 +149,7 @@ export default function AdminLoginPage() {
             />
             <PasswordInput
               label="Contraseña"
-              placeholder="••••••••"
+              placeholder=""
               styles={{
                 label: { color: '#888', fontSize: 12 },
                 input: { background: '#111', border: '1px solid #2a2a2a', color: '#fff' },
@@ -184,15 +184,6 @@ export default function AdminLoginPage() {
               Iniciar sesión
             </Button>
 
-            <Alert
-              color="dark"
-              style={{ background: '#111', border: '1px solid #1e1e1e' }}
-              p="xs"
-            >
-              <Text size="xs" style={{ color: '#444' }}>
-                Máximo 5 intentos por minuto. Acceso restringido a personal autorizado.
-              </Text>
-            </Alert>
           </Stack>
         </form>
       </Card>
