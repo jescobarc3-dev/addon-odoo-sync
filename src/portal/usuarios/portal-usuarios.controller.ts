@@ -30,11 +30,14 @@ export class PortalUsuariosController {
     return { permisos: [...PERMISOS_DISPONIBLES] };
   }
 
-  @Post('sync-odoo')
-  @HttpCode(HttpStatus.OK)
-  syncOdoo(@Req() req: Request & { user: JwtPortalPayload }) {
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  crearUsuario(
+    @Req() req: Request & { user: JwtPortalPayload },
+    @Body() body: { nombre: string; email: string; password: string; permisos: string[] },
+  ) {
     this.requireAdmin(req);
-    return this.service.syncDesdeOdoo();
+    return this.service.crearUsuario(body.nombre, body.email, body.password, body.permisos ?? []);
   }
 
   @Put(':id/permisos')
@@ -45,6 +48,17 @@ export class PortalUsuariosController {
   ) {
     this.requireAdmin(req);
     return this.service.actualizarPermisos(id, body.permisos);
+  }
+
+  @Put(':id/password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  cambiarPassword(
+    @Req() req: Request & { user: JwtPortalPayload },
+    @Param('id') id: string,
+    @Body() body: { password: string },
+  ) {
+    this.requireAdmin(req);
+    return this.service.cambiarPassword(id, body.password);
   }
 
   @Put(':id/activo')

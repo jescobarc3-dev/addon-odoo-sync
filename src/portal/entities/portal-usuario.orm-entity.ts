@@ -7,11 +7,14 @@ export class PortalUsuarioOrmEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ name: 'odoo_uid', type: 'int', unique: true })
-  odooUid!: number;
+  @Column({ name: 'odoo_uid', type: 'int', unique: true, nullable: true })
+  odooUid!: number | null;
 
   @Column({ name: 'odoo_login', unique: true })
   odooLogin!: string;
+
+  @Column({ name: 'password_hash', nullable: true })
+  passwordHash!: string | null;
 
   @Column()
   nombre!: string;

@@ -5,7 +5,7 @@ export interface PortalUser {
   id: string;
   nombre: string;
   email: string;
-  odooUid: number;
+  odooUid: number | null;
   permisos: string[];
   ultimoLogin: string | null;
   odooUrl: string | null;
@@ -13,7 +13,7 @@ export interface PortalUser {
 
 export interface PortalUsuarioAdmin {
   id: string;
-  odooUid: number;
+  odooUid: number | null;
   odooLogin: string;
   nombre: string;
   permisos: string[];
@@ -57,8 +57,8 @@ export const portalApi = createApi({
     getPermisosDisponibles: builder.query<{ permisos: string[] }, void>({
       query: () => '/portal/usuarios/permisos-disponibles',
     }),
-    syncOdooUsuarios: builder.mutation<{ nuevos: number; actualizados: number; total: number }, void>({
-      query: () => ({ url: '/portal/usuarios/sync-odoo', method: 'POST' }),
+    crearUsuario: builder.mutation<PortalUsuarioAdmin, { nombre: string; email: string; password: string; permisos: string[] }>({
+      query: (body) => ({ url: '/portal/usuarios', method: 'POST', body }),
       invalidatesTags: ['PortalUsuario'],
     }),
     actualizarPermisos: builder.mutation<PortalUsuarioAdmin, { id: string; permisos: string[] }>({
@@ -68,6 +68,13 @@ export const portalApi = createApi({
         body: { permisos },
       }),
       invalidatesTags: ['PortalUsuario'],
+    }),
+    cambiarPassword: builder.mutation<void, { id: string; password: string }>({
+      query: ({ id, password }) => ({
+        url: `/portal/usuarios/${id}/password`,
+        method: 'PUT',
+        body: { password },
+      }),
     }),
     toggleActivoUsuario: builder.mutation<PortalUsuarioAdmin, { id: string; activo: boolean }>({
       query: ({ id, activo }) => ({
@@ -88,7 +95,8 @@ export const {
   useGenerarEnlaceMutation,
   useGetPortalUsuariosQuery,
   useGetPermisosDisponiblesQuery,
-  useSyncOdooUsuariosMutation,
+  useCrearUsuarioMutation,
   useActualizarPermisosMutation,
+  useCambiarPasswordMutation,
   useToggleActivoUsuarioMutation,
 } = portalApi;

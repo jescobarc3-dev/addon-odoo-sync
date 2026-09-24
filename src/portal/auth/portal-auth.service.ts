@@ -2,11 +2,8 @@ import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
-import axios from 'axios';
+import * as bcrypt from 'bcryptjs';
 import { PortalUsuarioOrmEntity } from '../entities/portal-usuario.orm-entity';
-import { OdooCredencialesService } from '../../integracion_sap/odoo-credenciales.service';
-
-const PERMISOS_DEFAULT = ['integracion-sap:read'];
 
 @Injectable()
 export class PortalAuthService {
@@ -16,66 +13,31 @@ export class PortalAuthService {
     @InjectRepository(PortalUsuarioOrmEntity)
     private readonly repo: Repository<PortalUsuarioOrmEntity>,
     private readonly jwtService: JwtService,
-    private readonly odooCreds: OdooCredencialesService,
   ) {}
 
   async login(email: string, password: string) {
-    const creds = await this.odooCreds.getActiva();
+    const usuario = await this.repo.findOne({
+      where: { odooLogin: email.toLowerCase().trim() },
+    });
 
-    // Validate against Odoo — never store the password
-    let uid: number | null = null;
-    try {
-      const res = await axios.post(`${creds.url}/jsonrpc`, {
-        jsonrpc: '2.0', method: 'call',
-        params: { service: 'common', method: 'authenticate', args: [creds.db, email, password, {}] },
-      }, { timeout: 10000 });
-      const result = res.data?.result;
-      uid = typeof result === 'number' ? result : null;
-    } catch (e: any) {
-      this.logger.warn(`Error conectando a Odoo para login de ${email}: ${e.message}`);
-      throw new UnauthorizedException('No se pudo contactar con Odoo');
-    }
-
-    if (!uid) throw new UnauthorizedException('Credenciales de Odoo inválidas');
-
-    // Get user info from Odoo
-    let odooUser: { name: string; login: string } | null = null;
-    try {
-      const res = await axios.post(`${creds.url}/jsonrpc`, {
-        jsonrpc: '2.0', method: 'call',
-        params: {
-          service: 'object', method: 'execute_kw',
-          args: [creds.db, uid, password, 'res.users', 'read', [[uid]], { fields: ['name', 'login'] }],
-        },
-      }, { timeout: 10000 });
-      odooUser = res.data?.result?.[0] ?? null;
-    } catch {
-      // Non-critical — use email as fallback
-    }
-
-    // Upsert portal user
-    let usuario = await this.repo.findOne({ where: { odooUid: uid } });
-    if (!usuario) {
-      usuario = this.repo.create({
-        odooUid: uid,
-        odooLogin: email.toLowerCase().trim(),
-        nombre: odooUser?.name ?? email,
-        permisos: PERMISOS_DEFAULT,
-        activo: true,
-        sincronizadoEn: new Date(),
-      });
-      await this.repo.save(usuario);
-      this.logger.log(`Nuevo usuario portal: ${email} (Odoo UID ${uid})`);
-    } else if (!usuario.activo) {
-      this.logger.warn(`Login rechazado: usuario ${email} (UID ${uid}) está desactivado en el portal`);
+    // Misma respuesta si no existe el usuario o la contraseña es inválida
+    if (!usuario || !usuario.passwordHash) {
       throw new UnauthorizedException('Credenciales inválidas');
-    } else {
-      await this.repo.update(usuario.id, {
-        nombre: odooUser?.name ?? usuario.nombre,
-        ultimoLogin: new Date(),
-      });
     }
 
+    const valid = await bcrypt.compare(password, usuario.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+
+    if (!usuario.activo) {
+      this.logger.warn(`Login rechazado: usuario ${email} está desactivado`);
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+
+    await this.repo.update(usuario.id, { ultimoLogin: new Date() });
+
+    this.logger.log(`Login exitoso: ${email}`);
     return this._emitirTokens(usuario);
   }
 
@@ -100,7 +62,6 @@ export class PortalAuthService {
     const u = await this.repo.findOne({ where: { id: userId } });
     if (!u) throw new UnauthorizedException();
 
-    const creds = await this.odooCreds.getActiva().catch(() => null);
     return {
       id: u.id,
       nombre: u.nombre,
@@ -108,14 +69,13 @@ export class PortalAuthService {
       odooUid: u.odooUid,
       permisos: u.permisos,
       ultimoLogin: u.ultimoLogin,
-      odooUrl: creds?.url ?? null,
+      odooUrl: null,
     };
   }
 
   async generarMagicToken(userId: string): Promise<string> {
     const u = await this.repo.findOne({ where: { id: userId, activo: true } });
     if (!u) throw new UnauthorizedException();
-    // Magic token expira en 2 minutos
     return this.jwtService.sign(
       { sub: u.id, type: 'magic', odooUid: u.odooUid, email: u.odooLogin, permisos: u.permisos },
       { expiresIn: '2m', secret: process.env.PORTAL_JWT_SECRET || 'changeme-portal' },

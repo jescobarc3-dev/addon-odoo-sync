@@ -2,16 +2,17 @@
 
 import {
   Stack, Group, Text, Button, Badge, Switch, Card, Box,
-  Modal, MultiSelect, Skeleton, Tooltip, ActionIcon, Alert,
+  Modal, MultiSelect, Skeleton, Tooltip, ActionIcon, TextInput, PasswordInput,
 } from '@mantine/core';
-import { IconRefresh, IconEdit, IconUsers, IconAlertCircle } from '@tabler/icons-react';
+import { IconEdit, IconUsers, IconPlus, IconKey } from '@tabler/icons-react';
 import { useState } from 'react';
 import { notifications } from '@mantine/notifications';
 import {
   useGetPortalUsuariosQuery,
   useGetPermisosDisponiblesQuery,
-  useSyncOdooUsuariosMutation,
+  useCrearUsuarioMutation,
   useActualizarPermisosMutation,
+  useCambiarPasswordMutation,
   useToggleActivoUsuarioMutation,
   PortalUsuarioAdmin,
 } from '@/store/api/portalApi';
@@ -35,25 +36,37 @@ function FmtFecha({ iso }: { iso: string | null }) {
 export function UsuariosPage() {
   const { data: usuarios = [], isLoading } = useGetPortalUsuariosQuery();
   const { data: permisosData } = useGetPermisosDisponiblesQuery();
-  const [syncOdoo, { isLoading: syncing }] = useSyncOdooUsuariosMutation();
+  const [crearUsuario, { isLoading: creando }] = useCrearUsuarioMutation();
   const [actualizarPermisos] = useActualizarPermisosMutation();
+  const [cambiarPassword] = useCambiarPasswordMutation();
   const [toggleActivo] = useToggleActivoUsuarioMutation();
+
+  const [modalCrear, setModalCrear] = useState(false);
+  const [nuevoNombre, setNuevoNombre] = useState('');
+  const [nuevoEmail, setNuevoEmail] = useState('');
+  const [nuevoPassword, setNuevoPassword] = useState('');
+  const [nuevosPermisos, setNuevosPermisos] = useState<string[]>(['integracion-sap:read']);
 
   const [editando, setEditando] = useState<PortalUsuarioAdmin | null>(null);
   const [permisosDraft, setPermisosDraft] = useState<string[]>([]);
 
+  const [cambioPassword, setCambioPassword] = useState<PortalUsuarioAdmin | null>(null);
+  const [nuevoPasswordCambio, setNuevoPasswordCambio] = useState('');
+
   const permisosOpts = (permisosData?.permisos ?? []).map((p) => ({ value: p, label: p }));
 
-  const handleSync = async () => {
+  const handleCrear = async () => {
+    if (!nuevoNombre.trim() || !nuevoEmail.trim() || !nuevoPassword.trim()) {
+      notifications.show({ title: 'Campos requeridos', message: 'Completa todos los campos', color: 'red' });
+      return;
+    }
     try {
-      const res = await syncOdoo().unwrap();
-      notifications.show({
-        title: 'Sincronización completada',
-        message: `${res.nuevos} nuevos, ${res.actualizados} actualizados (total Odoo: ${res.total})`,
-        color: 'green',
-      });
+      await crearUsuario({ nombre: nuevoNombre, email: nuevoEmail, password: nuevoPassword, permisos: nuevosPermisos }).unwrap();
+      notifications.show({ title: 'Usuario creado', message: nuevoEmail, color: 'green' });
+      setModalCrear(false);
+      setNuevoNombre(''); setNuevoEmail(''); setNuevoPassword(''); setNuevosPermisos(['integracion-sap:read']);
     } catch (e: any) {
-      notifications.show({ title: 'Error al sincronizar', message: e?.data?.message ?? 'Error', color: 'red' });
+      notifications.show({ title: 'Error', message: e?.data?.message ?? 'No se pudo crear el usuario', color: 'red' });
     }
   };
 
@@ -73,6 +86,18 @@ export function UsuariosPage() {
     }
   };
 
+  const handleCambiarPassword = async () => {
+    if (!cambioPassword || !nuevoPasswordCambio.trim()) return;
+    try {
+      await cambiarPassword({ id: cambioPassword.id, password: nuevoPasswordCambio }).unwrap();
+      notifications.show({ title: 'Contraseña actualizada', message: cambioPassword.nombre, color: 'green' });
+      setCambioPassword(null);
+      setNuevoPasswordCambio('');
+    } catch {
+      notifications.show({ title: 'Error', message: 'No se pudo cambiar la contraseña', color: 'red' });
+    }
+  };
+
   const handleToggle = async (u: PortalUsuarioAdmin) => {
     try {
       await toggleActivo({ id: u.id, activo: !u.activo }).unwrap();
@@ -88,18 +113,10 @@ export function UsuariosPage() {
       <Group justify="space-between" align="flex-start">
         <Box>
           <Text fw={700} size="lg" c="#18181B">Usuarios del portal</Text>
-          <Text size="sm" c="#71717A">
-            Gestión de acceso y permisos — autenticación vía Odoo
-          </Text>
+          <Text size="sm" c="#71717A">Gestión de acceso y permisos</Text>
         </Box>
-        <Button
-          leftSection={<IconRefresh size={15} />}
-          loading={syncing}
-          onClick={handleSync}
-          color="ptSlate"
-          size="sm"
-        >
-          Sincronizar desde Odoo
+        <Button leftSection={<IconPlus size={15} />} onClick={() => setModalCrear(true)} color="ptSlate" size="sm">
+          Crear usuario
         </Button>
       </Group>
 
@@ -118,13 +135,6 @@ export function UsuariosPage() {
         </Card>
       </Group>
 
-      <Alert icon={<IconAlertCircle size={14} />} color="blue" radius="sm" p="sm">
-        <Text size="xs">
-          Los usuarios se sincronizan desde Odoo (solo lectura). Los nuevos usuarios se importan como
-          <strong> inactivos</strong> — actívalos aquí para darles acceso. Las credenciales nunca se almacenan en este sistema.
-        </Text>
-      </Alert>
-
       <Card withBorder p={0} style={{ background: '#fff', overflow: 'hidden' }}>
         {isLoading ? (
           <Stack p="md" gap="sm">
@@ -134,7 +144,7 @@ export function UsuariosPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#FAFAFA', borderBottom: '1px solid #E4E4E7' }}>
-                {['Usuario', 'Correo Odoo', 'Permisos', 'Último acceso', 'Sync Odoo', 'Activo', ''].map((h) => (
+                {['Usuario', 'Correo', 'Permisos', 'Último acceso', 'Activo', ''].map((h) => (
                   <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#71717A', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                 ))}
               </tr>
@@ -147,8 +157,7 @@ export function UsuariosPage() {
                       <Box style={{
                         width: 32, height: 32, borderRadius: '50%',
                         background: u.activo ? '#1A365D' : '#E4E4E7',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                       }}>
                         <Text size="xs" fw={700} c={u.activo ? 'white' : '#71717A'}>
                           {u.nombre.substring(0, 2).toUpperCase()}
@@ -172,30 +181,31 @@ export function UsuariosPage() {
                     </Group>
                   </td>
                   <td style={{ padding: '10px 14px' }}><FmtFecha iso={u.ultimoLogin} /></td>
-                  <td style={{ padding: '10px 14px' }}><FmtFecha iso={u.sincronizadoEn} /></td>
                   <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                    <Switch
-                      checked={u.activo}
-                      onChange={() => handleToggle(u)}
-                      color="ptGreen"
-                      size="sm"
-                    />
+                    <Switch checked={u.activo} onChange={() => handleToggle(u)} color="ptGreen" size="sm" />
                   </td>
                   <td style={{ padding: '10px 14px' }}>
-                    <Tooltip label="Editar permisos">
-                      <ActionIcon variant="subtle" color="gray" onClick={() => abrirEditar(u)}>
-                        <IconEdit size={15} />
-                      </ActionIcon>
-                    </Tooltip>
+                    <Group gap={4}>
+                      <Tooltip label="Editar permisos">
+                        <ActionIcon variant="subtle" color="gray" onClick={() => abrirEditar(u)}>
+                          <IconEdit size={15} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label="Cambiar contraseña">
+                        <ActionIcon variant="subtle" color="gray" onClick={() => { setCambioPassword(u); setNuevoPasswordCambio(''); }}>
+                          <IconKey size={15} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
                   </td>
                 </tr>
               ))}
               {usuarios.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '48px 0' }}>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '48px 0' }}>
                     <Stack align="center" gap="xs">
                       <IconUsers size={32} color="#D4D4D8" />
-                      <Text c="#A1A1AA" size="sm">Sin usuarios. Haz clic en "Sincronizar desde Odoo" para importarlos.</Text>
+                      <Text c="#A1A1AA" size="sm">Sin usuarios. Crea el primero con el botón de arriba.</Text>
                     </Stack>
                   </td>
                 </tr>
@@ -205,19 +215,32 @@ export function UsuariosPage() {
         )}
       </Card>
 
-      <Modal
-        opened={!!editando}
-        onClose={() => setEditando(null)}
-        title={`Permisos — ${editando?.nombre}`}
-        size="md"
-      >
+      {/* Modal: crear usuario */}
+      <Modal opened={modalCrear} onClose={() => setModalCrear(false)} title="Crear usuario" size="md">
         <Stack gap="md">
-          <Text size="sm" c="#71717A">
-            Correo Odoo: <strong>{editando?.odooLogin}</strong> · UID: {editando?.odooUid}
-          </Text>
+          <TextInput label="Nombre" placeholder="Juan Pérez" value={nuevoNombre} onChange={(e) => setNuevoNombre(e.currentTarget.value)} />
+          <TextInput label="Correo" placeholder="juan@empresa.com" value={nuevoEmail} onChange={(e) => setNuevoEmail(e.currentTarget.value)} />
+          <PasswordInput label="Contraseña" placeholder="Mínimo 8 caracteres" value={nuevoPassword} onChange={(e) => setNuevoPassword(e.currentTarget.value)} />
+          <MultiSelect
+            label="Permisos"
+            data={permisosOpts}
+            value={nuevosPermisos}
+            onChange={setNuevosPermisos}
+            placeholder="Selecciona permisos…"
+            size="sm"
+          />
+          <Group justify="flex-end">
+            <Button variant="default" size="sm" onClick={() => setModalCrear(false)}>Cancelar</Button>
+            <Button color="ptSlate" size="sm" loading={creando} onClick={handleCrear}>Crear</Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Modal: editar permisos */}
+      <Modal opened={!!editando} onClose={() => setEditando(null)} title={`Permisos — ${editando?.nombre}`} size="md">
+        <Stack gap="md">
           <MultiSelect
             label="Permisos asignados"
-            description="Selecciona los permisos que tendrá este usuario en el portal"
             data={permisosOpts}
             value={permisosDraft}
             onChange={setPermisosDraft}
@@ -233,6 +256,22 @@ export function UsuariosPage() {
           <Group justify="flex-end">
             <Button variant="default" size="sm" onClick={() => setEditando(null)}>Cancelar</Button>
             <Button color="ptSlate" size="sm" onClick={handleGuardarPermisos}>Guardar permisos</Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Modal: cambiar contraseña */}
+      <Modal opened={!!cambioPassword} onClose={() => setCambioPassword(null)} title={`Cambiar contraseña — ${cambioPassword?.nombre}`} size="sm">
+        <Stack gap="md">
+          <PasswordInput
+            label="Nueva contraseña"
+            placeholder="Mínimo 8 caracteres"
+            value={nuevoPasswordCambio}
+            onChange={(e) => setNuevoPasswordCambio(e.currentTarget.value)}
+          />
+          <Group justify="flex-end">
+            <Button variant="default" size="sm" onClick={() => setCambioPassword(null)}>Cancelar</Button>
+            <Button color="ptSlate" size="sm" onClick={handleCambiarPassword}>Guardar</Button>
           </Group>
         </Stack>
       </Modal>
