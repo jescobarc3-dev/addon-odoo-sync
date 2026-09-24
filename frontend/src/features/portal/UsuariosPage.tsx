@@ -4,12 +4,13 @@ import {
   Stack, Group, Text, Button, Badge, Switch, Card, Box,
   Modal, MultiSelect, Skeleton, Tooltip, ActionIcon, TextInput, PasswordInput,
 } from '@mantine/core';
-import { IconEdit, IconUsers, IconPlus, IconKey } from '@tabler/icons-react';
+import { IconEdit, IconUsers, IconPlus, IconKey, IconRefresh } from '@tabler/icons-react';
 import { useState } from 'react';
 import { notifications } from '@mantine/notifications';
 import {
   useGetPortalUsuariosQuery,
   useGetPermisosDisponiblesQuery,
+  useSyncOdooUsuariosMutation,
   useCrearUsuarioMutation,
   useActualizarPermisosMutation,
   useCambiarPasswordMutation,
@@ -36,6 +37,7 @@ function FmtFecha({ iso }: { iso: string | null }) {
 export function UsuariosPage() {
   const { data: usuarios = [], isLoading } = useGetPortalUsuariosQuery();
   const { data: permisosData } = useGetPermisosDisponiblesQuery();
+  const [syncOdoo, { isLoading: syncing }] = useSyncOdooUsuariosMutation();
   const [crearUsuario, { isLoading: creando }] = useCrearUsuarioMutation();
   const [actualizarPermisos] = useActualizarPermisosMutation();
   const [cambiarPassword] = useCambiarPasswordMutation();
@@ -54,6 +56,19 @@ export function UsuariosPage() {
   const [nuevoPasswordCambio, setNuevoPasswordCambio] = useState('');
 
   const permisosOpts = (permisosData?.permisos ?? []).map((p) => ({ value: p, label: p }));
+
+  const handleSync = async () => {
+    try {
+      const res = await syncOdoo().unwrap();
+      notifications.show({
+        title: 'Sincronización completada',
+        message: `${res.nuevos} nuevos, ${res.actualizados} actualizados (total Odoo: ${res.total})`,
+        color: 'green',
+      });
+    } catch (e: any) {
+      notifications.show({ title: 'Error al sincronizar', message: e?.data?.message ?? 'Error', color: 'red' });
+    }
+  };
 
   const handleCrear = async () => {
     if (!nuevoNombre.trim() || !nuevoEmail.trim() || !nuevoPassword.trim()) {
@@ -115,9 +130,14 @@ export function UsuariosPage() {
           <Text fw={700} size="lg" c="#18181B">Usuarios del portal</Text>
           <Text size="sm" c="#71717A">Gestión de acceso y permisos</Text>
         </Box>
-        <Button leftSection={<IconPlus size={15} />} onClick={() => setModalCrear(true)} color="ptSlate" size="sm">
-          Crear usuario
-        </Button>
+        <Group gap="xs">
+          <Button leftSection={<IconRefresh size={15} />} loading={syncing} onClick={handleSync} variant="default" size="sm">
+            Sincronizar desde Odoo
+          </Button>
+          <Button leftSection={<IconPlus size={15} />} onClick={() => setModalCrear(true)} color="ptSlate" size="sm">
+            Crear usuario
+          </Button>
+        </Group>
       </Group>
 
       <Group gap="md">

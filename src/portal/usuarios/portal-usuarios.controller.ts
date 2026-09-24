@@ -40,6 +40,13 @@ export class PortalUsuariosController {
     return this.service.crearUsuario(body.nombre, body.email, body.password, body.permisos ?? []);
   }
 
+  @Post('sync-odoo')
+  @HttpCode(HttpStatus.OK)
+  syncOdoo(@Req() req: Request & { user: JwtPortalPayload }) {
+    this.requireAdmin(req);
+    return this.service.syncDesdeOdoo();
+  }
+
   @Put(':id/permisos')
   actualizarPermisos(
     @Req() req: Request & { user: JwtPortalPayload },

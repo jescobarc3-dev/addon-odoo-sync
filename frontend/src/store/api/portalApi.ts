@@ -57,6 +57,10 @@ export const portalApi = createApi({
     getPermisosDisponibles: builder.query<{ permisos: string[] }, void>({
       query: () => '/portal/usuarios/permisos-disponibles',
     }),
+    syncOdooUsuarios: builder.mutation<{ nuevos: number; actualizados: number; total: number }, void>({
+      query: () => ({ url: '/portal/usuarios/sync-odoo', method: 'POST' }),
+      invalidatesTags: ['PortalUsuario'],
+    }),
     crearUsuario: builder.mutation<PortalUsuarioAdmin, { nombre: string; email: string; password: string; permisos: string[] }>({
       query: (body) => ({ url: '/portal/usuarios', method: 'POST', body }),
       invalidatesTags: ['PortalUsuario'],
@@ -95,6 +99,7 @@ export const {
   useGenerarEnlaceMutation,
   useGetPortalUsuariosQuery,
   useGetPermisosDisponiblesQuery,
+  useSyncOdooUsuariosMutation,
   useCrearUsuarioMutation,
   useActualizarPermisosMutation,
   useCambiarPasswordMutation,

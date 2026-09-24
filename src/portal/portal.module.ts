@@ -10,8 +10,13 @@ import { JwtPortalGuard } from './auth/guards/jwt-portal.guard';
 import { PortalPermisosGuard } from './auth/guards/portal-permisos.guard';
 import { PortalUsuariosController } from './usuarios/portal-usuarios.controller';
 import { PortalUsuariosService } from './usuarios/portal-usuarios.service';
+import { AdminModule } from '../admin/admin.module';
+import { IntegracionSapModule } from '../integracion_sap/integracion-sap.module';
+
 @Module({
   imports: [
+    AdminModule,
+    IntegracionSapModule,
     TypeOrmModule.forFeature([PortalUsuarioOrmEntity]),
     PassportModule,
     JwtModule.register({
