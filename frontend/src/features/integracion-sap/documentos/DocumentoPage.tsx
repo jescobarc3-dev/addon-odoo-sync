@@ -483,46 +483,47 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
               {!esPicking && (
                 <Box mt="md" style={{ borderTop: '1px solid #E4E4E7', paddingTop: 16 }}>
                   <Group align="center" gap="xs" mb={6}>
-                    <IconBuildingWarehouse size={16} color={!whsMapeado ? '#A32D2D' : '#A1A1AA'} />
-                    <Text size="sm" fw={600} c={!whsMapeado ? '#A32D2D' : '#52525B'}>
+                    <IconBuildingWarehouse size={16} color={!whsMapeado && !ubicacionOverrideId ? '#A32D2D' : '#A1A1AA'} />
+                    <Text size="sm" fw={600} c={!whsMapeado && !ubicacionOverrideId ? '#A32D2D' : '#52525B'}>
                       Almacén de destino
-                      {!whsMapeado && <Text span c="red"> *</Text>}
+                      {!whsMapeado && !ubicacionOverrideId && <Text span c="red"> *</Text>}
                     </Text>
                   </Group>
 
-                  {whsMapeado ? (
-                    <Text size="xs" c="#0F6E56">
-                      ✓ Se usará la columna &quot;{mapeoActual['whsCode']}&quot; del archivo.
+                  {whsMapeado && !ubicacionOverrideId && (
+                    <Text size="xs" c="#71717A" mb={6}>
+                      Columna detectada: &quot;{mapeoActual['whsCode']}&quot;. Selecciona un almacén de Odoo para aplicarlo a todas las filas.
                     </Text>
+                  )}
+
+                  {!whsMapeado && !ubicacionOverrideId && (
+                    <Text size="xs" c="#71717A" mb={8}>
+                      Sin columna de almacén. Selecciona uno de Odoo para todas las filas.
+                    </Text>
+                  )}
+
+                  {!cargarUbicaciones ? (
+                    <Button
+                      variant="outline" size="xs"
+                      leftSection={<IconBuildingWarehouse size={14} />}
+                      onClick={() => setCargarUbicaciones(true)}
+                    >
+                      Cargar almacenes de Odoo
+                    </Button>
                   ) : (
-                    <>
-                      <Text size="xs" c="#71717A" mb={8}>
-                        Sin columna de almacén. Selecciona uno de Odoo para todas las filas.
-                      </Text>
-                      {!cargarUbicaciones ? (
-                        <Button
-                          variant="outline" size="xs"
-                          leftSection={<IconBuildingWarehouse size={14} />}
-                          onClick={() => setCargarUbicaciones(true)}
-                        >
-                          Cargar almacenes de Odoo
-                        </Button>
-                      ) : (
-                        <Select
-                          placeholder={cargandoUbicaciones ? 'Cargando...' : 'Selecciona un almacén...'}
-                          data={(ubicaciones ?? []).map(u => ({ value: String(u.id), label: u.nombre }))}
-                          value={ubicacionOverrideId ? String(ubicacionOverrideId) : null}
-                          onChange={(val) => setUbicacionOverrideId(val ? Number(val) : null)}
-                          searchable disabled={cargandoUbicaciones} size="sm"
-                          style={{ maxWidth: 400 }}
-                        />
-                      )}
-                      {ubicacionOverrideId && ubicaciones && (
-                        <Text size="xs" c="#0F6E56" mt={4}>
-                          ✓ Todas las filas irán a: <strong>{ubicaciones.find(u => u.id === ubicacionOverrideId)?.nombre}</strong>
-                        </Text>
-                      )}
-                    </>
+                    <Select
+                      placeholder={cargandoUbicaciones ? 'Cargando...' : 'Selecciona un almacén...'}
+                      data={(ubicaciones ?? []).map(u => ({ value: String(u.id), label: u.nombre }))}
+                      value={ubicacionOverrideId ? String(ubicacionOverrideId) : null}
+                      onChange={(val) => setUbicacionOverrideId(val ? Number(val) : null)}
+                      searchable disabled={cargandoUbicaciones} size="sm"
+                      style={{ maxWidth: 400 }}
+                    />
+                  )}
+                  {ubicacionOverrideId && ubicaciones && (
+                    <Text size="xs" c="#0F6E56" mt={4}>
+                      ✓ Todas las filas irán a: <strong>{ubicaciones.find(u => u.id === ubicacionOverrideId)?.nombre}</strong>
+                    </Text>
                   )}
                 </Box>
               )}
