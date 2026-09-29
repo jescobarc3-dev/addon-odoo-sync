@@ -40,7 +40,6 @@ interface FilaPreview {
   onHand: number;
   uomCode: string;
   precioUnitario: number | null;
-  precioTotal: number | null;
   filaOriginal: number;
   advertencias: string[];
 }
@@ -80,7 +79,6 @@ const CAMPOS_INVENTARIO = [
   { key: 'whsCode', label: 'Almacén / Bodega', requerido: true },
   { key: 'onHand', label: 'Cantidad en existencia', requerido: true },
   { key: 'precioUnitario', label: 'Precio / Costo unitario', requerido: false },
-  { key: 'precioTotal', label: 'Precio total (opcional)', requerido: false },
   { key: 'uomCode', label: 'Unidad de medida', requerido: false },
 ];
 

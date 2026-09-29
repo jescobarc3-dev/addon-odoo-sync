@@ -8,7 +8,6 @@ export interface FilaInventario {
   onHand: number;
   uomCode: string;
   precioUnitario: number | null;
-  precioTotal: number | null;
   filaOriginal: number;
   advertencias: string[];
 }
@@ -63,7 +62,6 @@ export function aplicarMapeo(
     const itemCode = getStr(row, 'itemCode');
     const onHand = getNum(row, 'onHand');
     const precioUnitario = getNum(row, 'precioUnitario');
-    const precioTotal = getNum(row, 'precioTotal');
     if (!itemCode && isNaN(onHand)) continue;
 
     const advertencias: string[] = [];
@@ -77,7 +75,6 @@ export function aplicarMapeo(
       onHand: isNaN(onHand) ? 0 : onHand,
       uomCode: getStr(row, 'uomCode') || 'UND',
       precioUnitario: isNaN(precioUnitario) ? null : precioUnitario,
-      precioTotal: isNaN(precioTotal) ? null : precioTotal,
       filaOriginal: i + 2,
       advertencias,
     });
@@ -117,13 +114,14 @@ const KEYWORDS: Record<string, string[]> = {
     'unidad de medida', 'unidad', 'u.m.', 'uom', 'um',
   ],
   precioUnitario: [
+    // variantes con espacio (phrase match)
     'precio unitario', 'precio unit', 'costo unitario', 'costo unit',
-    'unit price', 'unit cost', 'precio', 'costo', 'price', 'cost',
-    'valor unitario', 'p.u.', 'p. unitario',
-  ],
-  precioTotal: [
-    'precio total', 'costo total', 'total price', 'total cost',
-    'valor total', 'importe', 'importe total', 'total',
+    'unit price', 'unit cost', 'valor unitario', 'p.u.', 'p. unitario',
+    // variantes camelCase/sin espacios (exportaciones SAP B1: "CostoUnitario", "PrecioUnitario")
+    // IMPORTANTE: 'costo'/'precio' eliminados — son demasiado genéricos y capturan
+    // "CostoTotal"/"PrecioTotal" cuando esa columna aparece antes en el header,
+    // causando que el precio total se cargue como precio unitario.
+    'costounitario', 'preciounitario', 'valorunitario',
   ],
 };
 
@@ -475,7 +473,6 @@ export class ArchivoParserService {
         onHand,
         uomCode: (cells['uomCode'] ?? []).join('').trim() || 'UND',
         precioUnitario: isNaN(precio) ? null : precio,
-        precioTotal: null,
         filaOriginal: i - headerIdx,
         advertencias: [],
       });
@@ -536,7 +533,6 @@ export class ArchivoParserService {
         onHand,
         uomCode: 'UND',
         precioUnitario: null,
-        precioTotal: null,
         filaOriginal: i + 1,
         advertencias: ['Extraído con método básico'],
       });
