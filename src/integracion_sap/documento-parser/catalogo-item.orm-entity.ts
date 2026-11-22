@@ -21,6 +21,9 @@ export class CatalogoItemOrmEntity {
   @Column({ name: 'precio_unitario', type: 'numeric', precision: 18, scale: 4, nullable: true })
   precioUnitario: number | null;
 
+  @Column({ name: 'cantidad_sap', type: 'numeric', precision: 18, scale: 4, nullable: true })
+  cantidadSap: number | null;
+
   @Column({ default: true })
   activo: boolean;
 

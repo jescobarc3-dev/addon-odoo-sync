@@ -8,6 +8,7 @@ export interface ItemCatalogo {
   itemName: string;
   uomCode?: string;
   precioUnitario?: number | null;
+  cantidadSap?: number | null;
 }
 
 @Injectable()
@@ -40,11 +41,12 @@ export class CatalogoItemService {
             itemName: it.itemName,
             uomCode: it.uomCode ?? null,
             precioUnitario: it.precioUnitario ?? null,
+            cantidadSap: it.cantidadSap ?? null,
             activo: true,
           })),
         )
         .orUpdate(
-          ['item_name', 'uom_code', 'precio_unitario', 'activo', 'actualizado_en'],
+          ['item_name', 'uom_code', 'precio_unitario', 'cantidad_sap', 'activo', 'actualizado_en'],
           ['empresa_codigo', 'item_code'],
           { skipUpdateIfNoValuesChanged: true },
         )

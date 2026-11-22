@@ -240,6 +240,7 @@ export class DocumentoUploadService {
         itemName: f.itemName,
         uomCode: f.uomCode || undefined,
         precioUnitario: f.precioUnitario ?? null,
+        cantidadSap: f.onHand ?? null,
       })),
     ).catch(e => this.logger.warn(`Catalogo upsert falló (no crítico): ${e.message}`));
   }

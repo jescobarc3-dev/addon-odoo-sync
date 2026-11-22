@@ -12,7 +12,7 @@ import { useState, useMemo } from 'react';
 import { useGetComparacionCatalogoQuery } from '@/store/api/integracionSapApi';
 import { useDebouncedValue } from '@mantine/hooks';
 
-type SortKey = 'itemCode' | 'itemName' | 'localPrecio' | 'odooPrecio' | 'odooStock' | 'difPrecio' | 'enOdoo';
+type SortKey = 'itemCode' | 'itemName' | 'localPrecio' | 'localCantidad' | 'odooPrecio' | 'odooStock' | 'difPrecio' | 'enOdoo';
 type SortDir = 'asc' | 'desc' | null;
 
 function toNum(v: any): number {
@@ -144,6 +144,7 @@ export function CatalogoPage() {
         else if (sortKey === 'itemName') { va = a.itemName; vb = b.itemName; }
         else if (sortKey === 'localPrecio') { va = toNum(a.local.precio); vb = toNum(b.local.precio); }
         else if (sortKey === 'odooPrecio') { va = toNum(a.odoo?.standardPrice); vb = toNum(b.odoo?.standardPrice); }
+        else if (sortKey === 'localCantidad') { va = toNum(a.local.cantidad); vb = toNum(b.local.cantidad); }
         else if (sortKey === 'odooStock') { va = toNum(a.odoo?.qtyAvailable); vb = toNum(b.odoo?.qtyAvailable); }
         else if (sortKey === 'difPrecio') {
           const da = difPct(a.local.precio, a.odoo?.standardPrice ?? null);
@@ -289,12 +290,14 @@ export function CatalogoPage() {
                   <SortTh col="itemCode" label="Código SAP" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} style={{ width: 130 }} />
                   <SortTh col="itemName" label="Nombre / Descripción" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                   <Table.Th style={{ width: 60 }}>UM</Table.Th>
-                  <SortTh col="localPrecio" label="Precio Addon" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}
-                    style={{ width: 115, textAlign: 'right', background: '#F0FDF4' }} />
+                  <SortTh col="localPrecio" label="Precio SAP" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}
+                    style={{ width: 105, textAlign: 'right', background: '#F0FDF4' }} />
+                  <SortTh col="localCantidad" label="Qty SAP" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}
+                    style={{ width: 85, textAlign: 'right', background: '#F0FDF4' }} />
                   <SortTh col="odooPrecio" label="Precio Odoo" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}
-                    style={{ width: 115, textAlign: 'right', background: '#EFF6FF' }} />
-                  <SortTh col="odooStock" label="Stock Odoo" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}
-                    style={{ width: 100, textAlign: 'right', background: '#EFF6FF' }} />
+                    style={{ width: 105, textAlign: 'right', background: '#EFF6FF' }} />
+                  <SortTh col="odooStock" label="Qty Odoo" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}
+                    style={{ width: 85, textAlign: 'right', background: '#EFF6FF' }} />
                   <SortTh col="difPrecio" label="Dif. precio" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}
                     style={{ width: 95, textAlign: 'center' }} />
                   <SortTh col="enOdoo" label="En Odoo" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}
@@ -325,6 +328,13 @@ export function CatalogoPage() {
                         </Table.Td>
                         <Table.Td style={{ textAlign: 'right', background: '#F0FDF420' }}>
                           <PrecioCell valor={item.local.precio} label="addon" />
+                        </Table.Td>
+                        <Table.Td style={{ textAlign: 'right', background: '#F0FDF420' }}>
+                          {item.local.cantidad != null
+                            ? <Text size="xs" fw={500} c={toNum(item.local.cantidad) > 0 ? '#166534' : '#A1A1AA'}>
+                                <NumberFormatter value={toNum(item.local.cantidad)} decimalScale={2} fixedDecimalScale />
+                              </Text>
+                            : <Text size="xs" c="#A1A1AA">—</Text>}
                         </Table.Td>
                         <Table.Td style={{ textAlign: 'right', background: '#EFF6FF50' }}>
                           {item.odoo

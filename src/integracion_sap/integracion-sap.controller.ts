@@ -262,7 +262,7 @@ export class IntegracionSapController {
         itemCode: local.itemCode,
         itemName: local.itemName,
         uomCode: local.uomCode,
-        local: { precio: local.precioUnitario },
+        local: { precio: local.precioUnitario, cantidad: local.cantidadSap },
         odoo: odooMap.get(local.itemCode) ?? null,
       })),
     };

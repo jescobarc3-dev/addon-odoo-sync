@@ -238,7 +238,7 @@ export const integracionSapApi = createApi({
           itemCode: string;
           itemName: string;
           uomCode?: string;
-          local: { precio: number | null };
+          local: { precio: number | null; cantidad: number | null };
           odoo: { defaultCode: string; nombre: string; standardPrice: number; qtyAvailable: number } | null;
         }>;
       },
