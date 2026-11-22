@@ -3,13 +3,13 @@ import '@mantine/dropzone/styles.css';
 import {
   Box, Text, Card, Badge, Group, ThemeIcon, Stack, Alert,
   Button, Table, ScrollArea, Select, SimpleGrid, Progress,
-  Stepper, Loader, Anchor, TextInput, Pagination,
+  Stepper, Loader, Anchor, TextInput, Pagination, ActionIcon, Tooltip,
 } from '@mantine/core';
 import { Dropzone, MIME_TYPES } from '@mantine/dropzone';
 import {
   IconDatabase, IconArrowRight, IconCheck, IconUpload, IconFile,
   IconX, IconAlertTriangle, IconCircleCheck, IconAdjustments, IconBuildingWarehouse,
-  IconHistory, IconPackage,
+  IconHistory, IconPackage, IconDownload,
 } from '@tabler/icons-react';
 
 import { useState, useEffect } from 'react';
@@ -149,6 +149,31 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobTotal, setJobTotal] = useState(0);
   const [paginaHistorial, setPaginaHistorial] = useState(1);
+
+  const [descargando, setDescargando] = useState<string | null>(null);
+
+  const descargarCarga = async (id: string, nombreArchivo: string | null) => {
+    setDescargando(id);
+    try {
+      const res = await fetch(`/api/integracion-sap/documentos/historial/${id}/descargar`, {
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data?.message ?? 'Esta carga no tiene filas guardadas (fue procesada antes de esta función).');
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nombreArchivo?.replace(/\.(xlsx?|csv)$/i, '') + '_recuperado.xlsx' ?? `carga-${id.slice(0, 8)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDescargando(null);
+    }
+  };
 
   const [subirDocumento, { isLoading: subiendo }] = useSubirDocumentoMutation();
   const [procesarDocumento, { isLoading: iniciando }] = useProcesarDocumentoMutation();
@@ -915,6 +940,7 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
                     <Table.Th style={{ textAlign: 'right' }}>Ajustados</Table.Th>
                     <Table.Th style={{ textAlign: 'right' }}>Errores</Table.Th>
                     <Table.Th>Detalle</Table.Th>
+                    <Table.Th style={{ textAlign: 'center' }}>Excel</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -963,6 +989,24 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
                         ) : (
                           <Text size="xs" c="#A1A1AA">—</Text>
                         )}
+                      </Table.Td>
+                      <Table.Td style={{ textAlign: 'center' }}>
+                        <Tooltip
+                          label={(h as any).lineasCarga?.length > 0 ? 'Descargar Excel de esta carga' : 'No disponible (carga anterior a esta función)'}
+                          withArrow
+                          fz="xs"
+                        >
+                          <ActionIcon
+                            variant="subtle"
+                            color="blue"
+                            size="sm"
+                            loading={descargando === h.id}
+                            disabled={(h as any).lineasCarga?.length === 0}
+                            onClick={() => descargarCarga(h.id, h.nombreArchivo)}
+                          >
+                            <IconDownload size={14} />
+                          </ActionIcon>
+                        </Tooltip>
                       </Table.Td>
                     </Table.Tr>
                   ))}

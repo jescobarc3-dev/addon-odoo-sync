@@ -2,7 +2,8 @@ import { Injectable, Logger, NotFoundException, BadRequestException, Inject } fr
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
-import { ArchivoParserService, ResultadoParse, aplicarMapeo } from './archivo-parser.service';
+import * as XLSX from 'xlsx';
+import { ArchivoParserService, ResultadoParse, aplicarMapeo, FilaInventario } from './archivo-parser.service';
 import { IOdooCatalogoPort, ODOO_CATALOGO_PORT, ItemLote } from '../salida-bodega/application/ports/odoo-catalogo.port';
 import { IOdooInventarioPort, ODOO_INVENTARIO_PORT } from '../salida-bodega/application/ports/odoo-inventario.port';
 import { IMapeoItemRepository, MAPEO_ITEM_REPOSITORY, TipoOperacionBodega } from '../salida-bodega/domain/repositories/mapeo-item.repository';
@@ -228,7 +229,7 @@ export class DocumentoUploadService {
     this.sesiones.delete(uploadId);
 
     this.logger.log(`Job ${jobId} completado: ${loteResult.ajustados} ajustados, ${loteResult.sinCambio} sin cambio`);
-    await this._guardarHistorial(sesion.tipo, sesion._originalname ?? null, resultadoFinal, null);
+    await this._guardarHistorial(sesion.tipo, sesion._originalname ?? null, resultadoFinal, null, filasValidas);
 
     // Poblar catálogo local con los items de esta carga (INVENTARIO_INICIAL o ACTUALIZACION_INVENTARIO)
     // Permite al parser PDF validar códigos en cargas futuras sin conectar a SAP ni Odoo.
@@ -408,10 +409,14 @@ export class DocumentoUploadService {
       `pickingId=${(pickingResult as any).pickingId ?? 'n/a'}, ` +
       `lineas=${lineas.length}`,
     );
-    await this._guardarHistorial(tipo, sesion._originalname ?? null, resultadoFinal,
+    await this._guardarHistorial(
+      tipo,
+      sesion._originalname ?? null,
+      resultadoFinal,
       pickingResult.tipo === 'ok_sin_stock'
         ? `Validado sin stock reservado: ${pickingResult.movesNoAsignados.join(', ')}`
         : null,
+      filasValidas,
     );
   }
 
@@ -422,6 +427,7 @@ export class DocumentoUploadService {
     nombreArchivo: string | null,
     resultado: ResultadoProcesamiento,
     errorFatal: string | null,
+    lineas: FilaInventario[] = [],
   ): Promise<void> {
     try {
       await this.historialRepo.save(
@@ -438,11 +444,45 @@ export class DocumentoUploadService {
           sinBodegaLista: resultado.sinBodega,
           estado: errorFatal ? 'error' : 'completado',
           errorFatal,
+          lineasCarga: lineas.map(f => ({
+            itemCode: f.itemCode,
+            itemName: f.itemName,
+            whsCode: f.whsCode,
+            onHand: f.onHand,
+            uomCode: f.uomCode || null,
+            precioUnitario: f.precioUnitario,
+          })),
         }),
       );
     } catch (err: any) {
       this.logger.warn(`No se pudo guardar historial: ${err.message}`);
     }
+  }
+
+  async generarExcelDescarga(id: string): Promise<{ buffer: Buffer; nombreArchivo: string }> {
+    const entry = await this.historialRepo.findOne({ where: { id } });
+    if (!entry) throw new NotFoundException(`Historial ${id} no encontrado`);
+    if (!entry.lineasCarga || entry.lineasCarga.length === 0) {
+      throw new BadRequestException(
+        'Esta carga fue procesada antes de que se implementara la descarga. ' +
+        'Solo las cargas nuevas tienen filas guardadas.',
+      );
+    }
+    const ws = XLSX.utils.json_to_sheet(
+      entry.lineasCarga.map(f => ({
+        'Código': f.itemCode,
+        'Descripción': f.itemName,
+        'Almacén': f.whsCode,
+        'Cantidad': f.onHand,
+        'UOM': f.uomCode ?? '',
+        'Precio Unitario': f.precioUnitario ?? '',
+      })),
+    );
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
+    const buffer: Buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const base = entry.nombreArchivo?.replace(/\.(xlsx?|csv)$/i, '') ?? `carga-${id.slice(0, 8)}`;
+    return { buffer, nombreArchivo: `${base}_recuperado.xlsx` };
   }
 
   async listarHistorial(tipo: string, limit = 20): Promise<HistorialCargaOrmEntity[]> {

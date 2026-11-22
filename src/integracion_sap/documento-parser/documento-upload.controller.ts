@@ -1,7 +1,8 @@
 import {
   Controller, Post, Get, Param, Body, UploadedFile,
-  UseInterceptors, BadRequestException, UseGuards,
+  UseInterceptors, BadRequestException, UseGuards, Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { DocumentoUploadService } from './documento-upload.service';
@@ -95,5 +96,21 @@ export class DocumentoUploadController {
   @ApiOperation({ summary: 'Últimas cargas de inventario para este tipo de documento' })
   async historial(@Param('tipo') tipo: string) {
     return this.uploadService.listarHistorial(tipo, 20);
+  }
+
+  @Get('historial/:id/descargar')
+  @RequirePermiso('integracion-sap:read')
+  @ApiOperation({ summary: 'Descargar Excel de una carga del historial' })
+  async descargarHistorial(
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, nombreArchivo } = await this.uploadService.generarExcelDescarga(id);
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${nombreArchivo}"`,
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
   }
 }

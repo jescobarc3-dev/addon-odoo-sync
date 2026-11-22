@@ -77,14 +77,18 @@ function LoginForm() {
       }} radius="md">
         {/* Logo */}
         <Box style={{ textAlign: 'center', marginBottom: 28 }}>
-          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-            <circle cx="24" cy="24" r="22" stroke="#8B1A1A" strokeWidth="2" />
-            <line x1="24" y1="2" x2="24" y2="46" stroke="#8B1A1A" strokeWidth="1.5" />
-            <line x1="2" y1="24" x2="46" y2="24" stroke="#8B1A1A" strokeWidth="1.5" />
-            <circle cx="24" cy="24" r="4" fill="#8B1A1A" />
-          </svg>
+          <Box style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#fff',
+            borderRadius: 16,
+            padding: '10px 14px',
+          }}>
+            <img src="/logo-login.png" alt="Logo" style={{ width: 72, height: 72, objectFit: 'contain', display: 'block' }} />
+          </Box>
           <Title order={2} style={{ color: '#fff', marginTop: 12, fontSize: 18, letterSpacing: 1 }}>
-            PROTECCIÓN TOTAL
+            Portal de Gestión
           </Title>
         </Box>
 

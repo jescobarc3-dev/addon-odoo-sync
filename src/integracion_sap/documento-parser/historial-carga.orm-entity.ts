@@ -41,6 +41,16 @@ export class HistorialCargaOrmEntity {
   @Column({ name: 'origen', length: 10, default: 'INT' })
   origen: string;
 
+  @Column({ name: 'lineas_carga', type: 'jsonb', default: [] })
+  lineasCarga: Array<{
+    itemCode: string;
+    itemName: string;
+    whsCode: string;
+    onHand: number;
+    uomCode: string | null;
+    precioUnitario: number | null;
+  }>;
+
   @Column({ name: 'error_fatal', type: 'text', nullable: true })
   errorFatal: string | null;
 
