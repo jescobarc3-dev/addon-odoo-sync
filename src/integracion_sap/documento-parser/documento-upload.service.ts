@@ -10,6 +10,21 @@ import { IMapeoItemRepository, MAPEO_ITEM_REPOSITORY, TipoOperacionBodega } from
 import { HistorialCargaOrmEntity } from './historial-carga.orm-entity';
 import { CatalogoItemService } from './catalogo-item.service';
 
+function calcularDiasHabiles(desde: Date, hasta: Date): number {
+  let count = 0;
+  const current = new Date(desde);
+  current.setDate(current.getDate() + 1);
+  current.setHours(0, 0, 0, 0);
+  const end = new Date(hasta);
+  end.setHours(23, 59, 59, 999);
+  while (current <= end) {
+    const day = current.getDay();
+    if (day !== 0 && day !== 6) count++;
+    current.setDate(current.getDate() + 1);
+  }
+  return count;
+}
+
 export interface SesionUpload {
   id: string;
   tipo: string;
@@ -537,7 +552,7 @@ export class DocumentoUploadService {
 
     const ultimaCargaInventario = ultimaInv?.creadoEn ?? null;
     const diasSinInventario = ultimaCargaInventario
-      ? Math.floor((Date.now() - ultimaCargaInventario.getTime()) / (1000 * 60 * 60 * 24))
+      ? calcularDiasHabiles(ultimaCargaInventario, new Date())
       : null;
 
     return {

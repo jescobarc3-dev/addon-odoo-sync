@@ -51,7 +51,7 @@ export function DashboardIntegracion() {
 
   const diasTexto = data.diasSinInventario === null
     ? 'Nunca se ha cargado un inventario.'
-    : `Última carga hace ${data.diasSinInventario} día${data.diasSinInventario !== 1 ? 's' : ''} (${new Date(data.ultimaCargaInventario!).toLocaleDateString('es-GT')}).`;
+    : `Última carga hace ${data.diasSinInventario} día${data.diasSinInventario !== 1 ? 's' : ''} hábil${data.diasSinInventario !== 1 ? 'es' : ''} (${new Date(data.ultimaCargaInventario!).toLocaleDateString('es-GT')}).`;
 
   return (
     <Stack gap="md">

@@ -245,7 +245,7 @@ export function CatalogoPage() {
         >
           {dashData.diasSinInventario === null
             ? 'Nunca se ha cargado un inventario.'
-            : `Última carga hace ${dashData.diasSinInventario} día${dashData.diasSinInventario !== 1 ? 's' : ''}.`}{' '}
+            : `Última carga hace ${dashData.diasSinInventario} día${dashData.diasSinInventario !== 1 ? 's' : ''} hábil${dashData.diasSinInventario !== 1 ? 'es' : ''}.`}{' '}
           <Anchor href="/integracion-sap/documentos/actualizacion" size="sm" fw={600}>
             Cargar actualización →
           </Anchor>
