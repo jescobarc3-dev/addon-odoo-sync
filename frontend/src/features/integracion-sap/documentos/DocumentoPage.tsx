@@ -167,7 +167,7 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = nombreArchivo?.replace(/\.(xlsx?|csv)$/i, '') + '_recuperado.xlsx' ?? `carga-${id.slice(0, 8)}.xlsx`;
+      a.download = (nombreArchivo?.replace(/\.(xlsx?|csv)$/i, '') ?? `carga-${id.slice(0, 8)}`) + '_recuperado.xlsx';
       a.click();
       URL.revokeObjectURL(url);
     } finally {
