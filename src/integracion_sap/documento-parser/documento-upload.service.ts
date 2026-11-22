@@ -511,6 +511,9 @@ export class DocumentoUploadService {
   async resumenHistorial(): Promise<{
     total: number; exitosos: number; errores: number; porcentajeExito: number;
     porTipo: Record<string, { total: number; exitosos: number; errores: number }>;
+    ultimaCargaInventario: Date | null;
+    diasSinInventario: number | null;
+    alertaInventarioVencido: boolean;
   }> {
     const tipos = ['SALIDA_BODEGA', 'ENTRADA_MERCANCIA', 'INVENTARIO_INICIAL', 'ACTUALIZACION_INVENTARIO'];
     const total = await this.historialRepo.count();
@@ -523,7 +526,28 @@ export class DocumentoUploadService {
       const err = await this.historialRepo.count({ where: { tipo, estado: 'error' } });
       porTipo[tipo] = { total: t, exitosos: e, errores: err };
     }
-    return { total, exitosos, errores, porcentajeExito: total > 0 ? Math.round((exitosos / total) * 100) : 0, porTipo };
+
+    const ultimaInv = await this.historialRepo.findOne({
+      where: [
+        { tipo: 'INVENTARIO_INICIAL', estado: 'completado' },
+        { tipo: 'ACTUALIZACION_INVENTARIO', estado: 'completado' },
+      ],
+      order: { creadoEn: 'DESC' },
+    });
+
+    const ultimaCargaInventario = ultimaInv?.creadoEn ?? null;
+    const diasSinInventario = ultimaCargaInventario
+      ? Math.floor((Date.now() - ultimaCargaInventario.getTime()) / (1000 * 60 * 60 * 24))
+      : null;
+
+    return {
+      total, exitosos, errores,
+      porcentajeExito: total > 0 ? Math.round((exitosos / total) * 100) : 0,
+      porTipo,
+      ultimaCargaInventario,
+      diasSinInventario,
+      alertaInventarioVencido: diasSinInventario === null || diasSinInventario > 5,
+    };
   }
 
   private limpiar() {

@@ -1,11 +1,11 @@
 'use client';
 import {
   Card, SimpleGrid, Text, Group, Box, RingProgress, Center,
-  Stack, Skeleton, Badge, ThemeIcon, Progress,
+  Stack, Skeleton, Badge, ThemeIcon, Progress, Alert, Anchor,
 } from '@mantine/core';
 import {
   IconCheck, IconAlertTriangle, IconPackage, IconArrowRight,
-  IconTrendingUp, IconX,
+  IconTrendingUp, IconX, IconRefreshAlert,
 } from '@tabler/icons-react';
 import { useGetDashboardQuery } from '@/store/api/integracionSapApi';
 
@@ -49,8 +49,28 @@ export function DashboardIntegracion() {
 
   const tipos = ['SALIDA_BODEGA', 'ENTRADA_MERCANCIA', 'INVENTARIO_INICIAL', 'ACTUALIZACION_INVENTARIO'];
 
+  const diasTexto = data.diasSinInventario === null
+    ? 'Nunca se ha cargado un inventario.'
+    : `Última carga hace ${data.diasSinInventario} día${data.diasSinInventario !== 1 ? 's' : ''} (${new Date(data.ultimaCargaInventario!).toLocaleDateString('es-GT')}).`;
+
   return (
     <Stack gap="md">
+      {/* Alerta de inventario desactualizado */}
+      {data.alertaInventarioVencido && (
+        <Alert
+          icon={<IconRefreshAlert size={18} />}
+          color={data.diasSinInventario === null ? 'red' : 'orange'}
+          title="Inventario desactualizado"
+          styles={{ title: { fontWeight: 700 } }}
+        >
+          {diasTexto}{' '}
+          Los precios y existencias en Odoo pueden no reflejar el estado actual de SAP.{' '}
+          <Anchor href="/integracion-sap/documentos/actualizacion" size="sm" fw={600}>
+            Cargar actualización →
+          </Anchor>
+        </Alert>
+      )}
+
       {/* KPIs principales */}
       <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
         <Card withBorder p="lg" style={{ background: '#fff' }}>

@@ -2,14 +2,14 @@
 import {
   Box, Card, Text, Group, TextInput, Table, Badge,
   Skeleton, Alert, ThemeIcon, NumberFormatter, Pagination,
-  Tooltip, ActionIcon, SegmentedControl, Select,
+  Tooltip, ActionIcon, SegmentedControl, Select, Anchor,
 } from '@mantine/core';
 import {
   IconSearch, IconPackage, IconAlertTriangle, IconDatabase,
-  IconRefresh, IconCheck, IconX, IconArrowUp, IconArrowDown, IconArrowsSort,
+  IconRefresh, IconCheck, IconX, IconArrowUp, IconArrowDown, IconArrowsSort, IconRefreshAlert,
 } from '@tabler/icons-react';
 import { useState, useMemo } from 'react';
-import { useGetComparacionCatalogoQuery } from '@/store/api/integracionSapApi';
+import { useGetComparacionCatalogoQuery, useGetDashboardQuery } from '@/store/api/integracionSapApi';
 import { useDebouncedValue } from '@mantine/hooks';
 
 type SortKey = 'itemCode' | 'itemName' | 'localPrecio' | 'localCantidad' | 'odooPrecio' | 'odooStock' | 'difPrecio' | 'enOdoo';
@@ -86,6 +86,8 @@ export function CatalogoPage() {
   const [sortDir, setSortDir] = useState<SortDir>(null);
   const [filtroOdoo, setFiltroOdoo] = useState<FiltroOdoo>('todos');
   const [filtroDif, setFiltroDif] = useState<FiltroDif>('todos');
+
+  const { data: dashData } = useGetDashboardQuery(undefined, { pollingInterval: 60000 });
 
   const { data, isLoading, isError, isFetching, refetch } = useGetComparacionCatalogoQuery(
     { q: debouncedQ, page, limit: LIMIT },
@@ -234,6 +236,21 @@ export function CatalogoPage() {
           />
         </Group>
       </Card>
+
+      {/* Alerta inventario desactualizado */}
+      {dashData?.alertaInventarioVencido && (
+        <Alert icon={<IconRefreshAlert size={16} />} color={dashData.diasSinInventario === null ? 'red' : 'orange'}
+          title="Los datos de esta tabla pueden estar desactualizados" mb="md"
+          styles={{ title: { fontWeight: 700 } }}
+        >
+          {dashData.diasSinInventario === null
+            ? 'Nunca se ha cargado un inventario.'
+            : `Última carga hace ${dashData.diasSinInventario} día${dashData.diasSinInventario !== 1 ? 's' : ''}.`}{' '}
+          <Anchor href="/integracion-sap/documentos/actualizacion" size="sm" fw={600}>
+            Cargar actualización →
+          </Anchor>
+        </Alert>
+      )}
 
       {/* Leyenda */}
       <Card withBorder p="sm" mb="md" style={{ background: '#F8FAFC' }}>

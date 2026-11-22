@@ -53,6 +53,9 @@ export interface Dashboard {
   errores: number;
   porcentajeExito: number;
   porTipo: Record<string, { total: number; exitosos: number; errores: number }>;
+  ultimaCargaInventario: string | null;
+  diasSinInventario: number | null;
+  alertaInventarioVencido: boolean;
 }
 
 export interface HistorialEntry {
