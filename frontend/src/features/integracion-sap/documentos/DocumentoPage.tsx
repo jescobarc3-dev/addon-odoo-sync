@@ -9,7 +9,7 @@ import { Dropzone, MIME_TYPES } from '@mantine/dropzone';
 import {
   IconDatabase, IconArrowRight, IconCheck, IconUpload, IconFile,
   IconX, IconAlertTriangle, IconCircleCheck, IconAdjustments, IconBuildingWarehouse,
-  IconHistory, IconPackage, IconDownload,
+  IconHistory, IconPackage, IconDownload, IconFileTypePdf, IconFileTypeXls,
 } from '@tabler/icons-react';
 
 import { useState, useEffect } from 'react';
@@ -173,22 +173,24 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
 
   const [descargando, setDescargando] = useState<string | null>(null);
 
-  const descargarCarga = async (id: string, nombreArchivo: string | null) => {
-    setDescargando(id);
+  const descargarArchivo = async (id: string, endpoint: 'descargar' | 'original', fallbackNombre: string | null) => {
+    setDescargando(`${id}-${endpoint}`);
     try {
-      const res = await fetch(`/api/integracion-sap/documentos/historial/${id}/descargar`, {
+      const res = await fetch(`/api/integracion-sap/documentos/historial/${id}/${endpoint}`, {
         credentials: 'include',
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert(data?.message ?? 'Esta carga no tiene filas guardadas (fue procesada antes de esta función).');
+        alert(data?.message ?? 'Archivo no disponible para esta carga.');
         return;
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = (nombreArchivo?.replace(/\.(xlsx?|csv)$/i, '') ?? `carga-${id.slice(0, 8)}`) + '_recuperado.xlsx';
+      const cd = res.headers.get('content-disposition');
+      const match = cd?.match(/filename="?([^"]+)"?/);
+      a.download = match?.[1] ?? (fallbackNombre ?? `carga-${id.slice(0, 8)}`);
       a.click();
       URL.revokeObjectURL(url);
     } finally {
@@ -964,7 +966,8 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
                     <Table.Th style={{ textAlign: 'right' }}>Ajustados</Table.Th>
                     <Table.Th style={{ textAlign: 'right' }}>Errores</Table.Th>
                     <Table.Th>Detalle</Table.Th>
-                    <Table.Th style={{ textAlign: 'center' }}>Excel</Table.Th>
+                    <Table.Th style={{ textAlign: 'center' }}>Original</Table.Th>
+                    <Table.Th style={{ textAlign: 'center' }}>Datos</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -1015,18 +1018,40 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
                         )}
                       </Table.Td>
                       <Table.Td style={{ textAlign: 'center' }}>
+                        {/* Descargar archivo original (PDF o Excel tal como fue subido) */}
                         <Tooltip
-                          label={(h as any).lineasCarga?.length > 0 ? 'Descargar Excel de esta carga' : 'No disponible (carga anterior a esta función)'}
-                          withArrow
-                          fz="xs"
+                          label={(h as any).archivoOriginalMimetype
+                            ? `Descargar ${(h as any).archivoOriginalMimetype === 'application/pdf' ? 'PDF' : 'Excel'} original`
+                            : 'No disponible (carga anterior a esta función)'}
+                          withArrow fz="xs"
+                        >
+                          <ActionIcon
+                            variant="subtle"
+                            color={(h as any).archivoOriginalMimetype === 'application/pdf' ? 'red' : 'teal'}
+                            size="sm"
+                            loading={descargando === `${h.id}-original`}
+                            disabled={!(h as any).archivoOriginalMimetype}
+                            onClick={() => descargarArchivo(h.id, 'original', h.nombreArchivo)}
+                          >
+                            {(h as any).archivoOriginalMimetype === 'application/pdf'
+                              ? <IconFileTypePdf size={14} />
+                              : <IconFileTypeXls size={14} />}
+                          </ActionIcon>
+                        </Tooltip>
+                      </Table.Td>
+                      <Table.Td style={{ textAlign: 'center' }}>
+                        {/* Descargar Excel de datos parseados/normalizados */}
+                        <Tooltip
+                          label={(h as any).lineasCarga?.length > 0 ? 'Descargar Excel de datos procesados' : 'No disponible (carga anterior a esta función)'}
+                          withArrow fz="xs"
                         >
                           <ActionIcon
                             variant="subtle"
                             color="blue"
                             size="sm"
-                            loading={descargando === h.id}
+                            loading={descargando === `${h.id}-descargar`}
                             disabled={(h as any).lineasCarga?.length === 0}
-                            onClick={() => descargarCarga(h.id, h.nombreArchivo)}
+                            onClick={() => descargarArchivo(h.id, 'descargar', h.nombreArchivo)}
                           >
                             <IconDownload size={14} />
                           </ActionIcon>

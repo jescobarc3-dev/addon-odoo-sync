@@ -54,6 +54,12 @@ export class HistorialCargaOrmEntity {
   @Column({ name: 'error_fatal', type: 'text', nullable: true })
   errorFatal: string | null;
 
+  @Column({ name: 'archivo_original', type: 'bytea', nullable: true, select: false })
+  archivoOriginal: Buffer | null;
+
+  @Column({ name: 'archivo_original_mimetype', length: 50, nullable: true })
+  archivoOriginalMimetype: string | null;
+
   @CreateDateColumn({ name: 'creado_en', type: 'timestamptz' })
   creadoEn: Date;
 }

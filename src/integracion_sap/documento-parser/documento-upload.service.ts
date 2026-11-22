@@ -249,7 +249,7 @@ export class DocumentoUploadService {
     this.sesiones.delete(uploadId);
 
     this.logger.log(`Job ${jobId} completado: ${loteResult.ajustados} ajustados, ${loteResult.sinCambio} sin cambio`);
-    await this._guardarHistorial(sesion.tipo, sesion._originalname ?? null, resultadoFinal, null, filasValidas);
+    await this._guardarHistorial(sesion.tipo, sesion._originalname ?? null, resultadoFinal, null, filasValidas, sesion._buffer, sesion._mimetype);
 
     // Poblar catálogo local con los items de esta carga (INVENTARIO_INICIAL o ACTUALIZACION_INVENTARIO)
     // Permite al parser PDF validar códigos en cargas futuras sin conectar a SAP ni Odoo.
@@ -438,6 +438,8 @@ export class DocumentoUploadService {
         ? `Validado sin stock reservado: ${pickingResult.movesNoAsignados.join(', ')}`
         : null,
       filasValidas,
+      sesion._buffer,
+      sesion._mimetype,
     );
   }
 
@@ -559,7 +561,7 @@ export class DocumentoUploadService {
     this.sesiones.delete(uploadId);
 
     this.logger.log(`Job empleados ${jobId} completado: ${ajustados} sincronizados, ${detalleErrores.length} errores`);
-    await this._guardarHistorial('CARGA_EMPLEADOS', sesion._originalname ?? null, resultadoFinal, null);
+    await this._guardarHistorial('CARGA_EMPLEADOS', sesion._originalname ?? null, resultadoFinal, null, [], sesion._buffer, sesion._mimetype);
   }
 
   // ── Historial ─────────────────────────────────────────────────────────────
@@ -570,6 +572,8 @@ export class DocumentoUploadService {
     resultado: ResultadoProcesamiento,
     errorFatal: string | null,
     lineas: FilaInventario[] = [],
+    archivoOriginal?: Buffer | null,
+    archivoOriginalMimetype?: string | null,
   ): Promise<void> {
     try {
       await this.historialRepo.save(
@@ -594,11 +598,33 @@ export class DocumentoUploadService {
             uomCode: f.uomCode || null,
             precioUnitario: f.precioUnitario,
           })),
+          archivoOriginal: archivoOriginal ?? null,
+          archivoOriginalMimetype: archivoOriginalMimetype ?? null,
         }),
       );
     } catch (err: any) {
       this.logger.warn(`No se pudo guardar historial: ${err.message}`);
     }
+  }
+
+  async descargarOriginal(id: string): Promise<{ buffer: Buffer; nombreArchivo: string; mimetype: string }> {
+    const entry = await this.historialRepo
+      .createQueryBuilder('h')
+      .select(['h.id', 'h.nombreArchivo', 'h.archivoOriginal', 'h.archivoOriginalMimetype'])
+      .where('h.id = :id', { id })
+      .getOne();
+    if (!entry) throw new NotFoundException(`Historial ${id} no encontrado`);
+    if (!entry.archivoOriginal) {
+      throw new BadRequestException(
+        'Esta carga no tiene el archivo original guardado. Solo las cargas nuevas lo almacenan.',
+      );
+    }
+    const nombre = entry.nombreArchivo ?? `carga-${id.slice(0, 8)}`;
+    return {
+      buffer: entry.archivoOriginal,
+      nombreArchivo: nombre,
+      mimetype: entry.archivoOriginalMimetype ?? 'application/octet-stream',
+    };
   }
 
   async generarExcelDescarga(id: string): Promise<{ buffer: Buffer; nombreArchivo: string }> {

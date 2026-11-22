@@ -103,7 +103,7 @@ export class DocumentoUploadController {
 
   @Get('historial/:id/descargar')
   @RequirePermiso('integracion-sap:read')
-  @ApiOperation({ summary: 'Descargar Excel de una carga del historial' })
+  @ApiOperation({ summary: 'Descargar Excel de datos parseados de una carga del historial' })
   async descargarHistorial(
     @Param('id') id: string,
     @Res() res: Response,
@@ -111,6 +111,22 @@ export class DocumentoUploadController {
     const { buffer, nombreArchivo } = await this.uploadService.generarExcelDescarga(id);
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${nombreArchivo}"`,
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
+  }
+
+  @Get('historial/:id/original')
+  @RequirePermiso('integracion-sap:read')
+  @ApiOperation({ summary: 'Descargar el archivo original tal como fue subido (PDF o Excel)' })
+  async descargarOriginal(
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, nombreArchivo, mimetype } = await this.uploadService.descargarOriginal(id);
+    res.set({
+      'Content-Type': mimetype,
       'Content-Disposition': `attachment; filename="${nombreArchivo}"`,
       'Content-Length': buffer.length,
     });
