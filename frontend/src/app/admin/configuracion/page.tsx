@@ -56,8 +56,26 @@ export default function ConfiguracionPage() {
   const [testingId, setTestingId] = useState<string | null>(null);
   const [opened, { open, close }] = useDisclosure(false);
   const [editando, setEditando] = useState<string | null>(null);
-  const [user, setUser] = useState<{ email: string; rol: string; totpActivo: boolean } | null>(null);
+  const [user, setUser] = useState<{ email: string; rol: string; totpActivo: boolean; odooLogin: string | null } | null>(null);
+  const [odooLoginInput, setOdooLoginInput] = useState('');
+  const [savingOdooLogin, setSavingOdooLogin] = useState(false);
   const [switchingPortal, setSwitchingPortal] = useState(false);
+
+  const guardarOdooLogin = async () => {
+    setSavingOdooLogin(true);
+    try {
+      await apiFetch('/admin/auth/odoo-login', {
+        method: 'PUT',
+        body: JSON.stringify({ odooLogin: odooLoginInput.trim() || null }),
+      });
+      setUser(prev => prev ? { ...prev, odooLogin: odooLoginInput.trim() || null } : prev);
+      notifications.show({ color: 'green', title: 'Guardado', message: 'Correo Odoo vinculado correctamente.' });
+    } catch (err: any) {
+      notifications.show({ color: 'red', title: 'Error', message: err.message ?? 'No se pudo guardar.' });
+    } finally {
+      setSavingOdooLogin(false);
+    }
+  };
 
   const irAlPortal = async () => {
     setSwitchingPortal(true);
@@ -107,7 +125,7 @@ export default function ConfiguracionPage() {
 
   useEffect(() => {
     apiFetch('/admin/auth/me')
-      .then(setUser)
+      .then(me => { setUser(me); setOdooLoginInput(me.odooLogin ?? ''); })
       .catch(() => router.push('/admin/login'));
     cargarConexiones();
     const interval = setInterval(cargarConexiones, 30000);
@@ -474,6 +492,37 @@ export default function ConfiguracionPage() {
             )}
           </Group>
         </Group>
+      </Card>
+
+      {/* Vínculo a cuenta Odoo (portal) */}
+      <Card style={{ background: '#111', border: '1px solid #1e1e1e', marginTop: 12 }} p="md" radius="sm">
+        <Text style={{ color: '#fff', fontWeight: 600, fontSize: 14 }} mb={4}>
+          Correo Odoo vinculado al portal
+        </Text>
+        <Text size="xs" style={{ color: '#555', marginBottom: 12 }}>
+          Si tu correo de este panel es distinto al de Odoo, ponlo aquí para que "Ir al portal →" funcione sin re-autenticarte.
+          Solo tú podés modificar este vínculo.
+        </Text>
+        <Group gap="xs" align="flex-end">
+          <TextInput
+            placeholder={user?.email ?? 'correo@odoo.com'}
+            value={odooLoginInput}
+            onChange={e => setOdooLoginInput(e.currentTarget.value)}
+            style={{ flex: 1 }}
+            styles={{
+              input: { background: '#0a0a0a', border: '1px solid #2a2a2a', color: '#fff' },
+            }}
+            size="xs"
+          />
+          <Button size="xs" style={{ background: '#8B1A1A' }} loading={savingOdooLogin} onClick={guardarOdooLogin}>
+            Guardar
+          </Button>
+        </Group>
+        {user?.odooLogin && (
+          <Text size="xs" style={{ color: '#3b8c5e', marginTop: 6 }}>
+            ✓ Vinculado a {user.odooLogin}
+          </Text>
+        )}
       </Card>
 
       {/* Nota de seguridad */}

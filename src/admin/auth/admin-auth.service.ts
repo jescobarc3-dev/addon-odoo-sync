@@ -59,7 +59,13 @@ export class AdminAuthService {
   async me(userId: string) {
     const u = await this.usuarioRepo.findOne({ where: { id: userId } });
     if (!u) throw new UnauthorizedException();
-    return { id: u.id, email: u.email, rol: u.rol, totpActivo: u.totpActivo, ultimoAcceso: u.ultimoAcceso };
+    return { id: u.id, email: u.email, rol: u.rol, totpActivo: u.totpActivo, ultimoAcceso: u.ultimoAcceso, odooLogin: u.odooLogin };
+  }
+
+  async setOdooLogin(userId: string, odooLogin: string | null): Promise<void> {
+    const valor = odooLogin?.toLowerCase().trim() || null;
+    await this.usuarioRepo.update(userId, { odooLogin: valor });
+    this.logger.log(`odoo_login actualizado para admin ${userId}: ${valor ?? '(limpiado)'}`);
   }
 
   async setupTotp(userId: string): Promise<{ secret: string; qrCodeDataUrl: string }> {

@@ -23,6 +23,9 @@ export class AdminUsuarioOrmEntity {
   @Column({ default: true })
   activo!: boolean;
 
+  @Column({ name: 'odoo_login', nullable: true, length: 255 })
+  odooLogin!: string | null;
+
   @Column({ name: 'ultimo_acceso', nullable: true, type: 'timestamptz' })
   ultimoAcceso!: Date | null;
 
