@@ -1,5 +1,5 @@
 import {
-  Controller, Post, Get, Put, Body, Res, Req, UseGuards, HttpCode, HttpStatus, NotFoundException,
+  Controller, Post, Get, Put, Body, Res, Req, UseGuards, HttpCode, HttpStatus, NotFoundException, BadRequestException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Response, Request } from 'express';
@@ -78,7 +78,20 @@ export class AdminAuthController {
     @Req() req: Request & { user: JwtAdminPayload },
     @Body() body: { odooLogin: string | null },
   ) {
-    await this.authService.setOdooLogin(req.user.sub, body.odooLogin ?? null);
+    const email = body.odooLogin?.toLowerCase().trim() || null;
+
+    if (email) {
+      const portalUser = await this.portalRepo.findOne({
+        where: { odooLogin: email, activo: true },
+      });
+      if (!portalUser) {
+        throw new BadRequestException(
+          `"${email}" no tiene cuenta activa en el portal. Sincronizá los usuarios desde Odoo primero.`,
+        );
+      }
+    }
+
+    await this.authService.setOdooLogin(req.user.sub, email);
     return { ok: true };
   }
 

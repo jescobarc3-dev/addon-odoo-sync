@@ -500,8 +500,8 @@ export default function ConfiguracionPage() {
           Correo Odoo vinculado al portal
         </Text>
         <Text size="xs" style={{ color: '#555', marginBottom: 12 }}>
-          Si tu correo de este panel es distinto al de Odoo, ponlo aquí para que "Ir al portal →" funcione sin re-autenticarte.
-          Solo tú podés modificar este vínculo.
+          Escribí el correo de tu cuenta Odoo. Debe existir en la lista de usuarios del portal (si no, sincronizá primero desde la sección Usuarios).
+          Al guardar se valida automáticamente que ese correo tenga cuenta activa — sin pedir contraseña. Solo tú podés modificar este vínculo.
         </Text>
         <Group gap="xs" align="flex-end">
           <TextInput
