@@ -12,7 +12,7 @@ import { useState, useMemo } from 'react';
 import { useGetComparacionCatalogoQuery } from '@/store/api/integracionSapApi';
 import { useDebouncedValue } from '@mantine/hooks';
 
-type SortKey = 'itemCode' | 'itemName' | 'localPrecio' | 'odooPrecio' | 'odooStock';
+type SortKey = 'itemCode' | 'itemName' | 'localPrecio' | 'odooPrecio' | 'odooStock' | 'difPrecio' | 'enOdoo';
 type SortDir = 'asc' | 'desc' | null;
 
 function toNum(v: any): number {
@@ -141,6 +141,13 @@ export function CatalogoPage() {
         else if (sortKey === 'localPrecio') { va = toNum(a.local.precio); vb = toNum(b.local.precio); }
         else if (sortKey === 'odooPrecio') { va = toNum(a.odoo?.standardPrice); vb = toNum(b.odoo?.standardPrice); }
         else if (sortKey === 'odooStock') { va = toNum(a.odoo?.qtyAvailable); vb = toNum(b.odoo?.qtyAvailable); }
+        else if (sortKey === 'difPrecio') {
+          const da = difPct(a.local.precio, a.odoo?.standardPrice ?? null);
+          const db = difPct(b.local.precio, b.odoo?.standardPrice ?? null);
+          va = da === null ? -1 : da === Infinity ? 9999 : da;
+          vb = db === null ? -1 : db === Infinity ? 9999 : db;
+        }
+        else if (sortKey === 'enOdoo') { va = a.odoo ? 1 : 0; vb = b.odoo ? 1 : 0; }
 
         if (typeof va === 'string') {
           return sortDir === 'asc' ? va.localeCompare(vb as string) : (vb as string).localeCompare(va);
@@ -282,8 +289,10 @@ export function CatalogoPage() {
                     style={{ width: 115, textAlign: 'right', background: '#EFF6FF' }} />
                   <SortTh col="odooStock" label="Stock Odoo" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}
                     style={{ width: 100, textAlign: 'right', background: '#EFF6FF' }} />
-                  <Table.Th style={{ width: 95, textAlign: 'center' }}>Dif. precio</Table.Th>
-                  <Table.Th style={{ width: 85, textAlign: 'center' }}>En Odoo</Table.Th>
+                  <SortTh col="difPrecio" label="Dif. precio" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}
+                    style={{ width: 95, textAlign: 'center' }} />
+                  <SortTh col="enOdoo" label="En Odoo" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}
+                    style={{ width: 85, textAlign: 'center' }} />
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
