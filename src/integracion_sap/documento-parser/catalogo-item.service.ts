@@ -121,6 +121,39 @@ export class CatalogoItemService {
     return fallback.map(r => ({ itemCode: r.itemCode, itemName: r.itemName, uomCode: r.uomCode ?? undefined }));
   }
 
+  /** Búsqueda paginada por offset — para la vista de comparación. */
+  async buscarPaginado(
+    empresa: string,
+    q: string,
+    limit: number,
+    offset: number,
+  ): Promise<{ items: ItemCatalogo[]; total: number }> {
+    const qb = this.repo
+      .createQueryBuilder('c')
+      .where('c.empresa_codigo = :emp', { emp: empresa })
+      .andWhere('c.activo = true');
+
+    if (q && q.trim().length >= 2) {
+      qb.andWhere('(c.item_name ILIKE :q OR c.item_code ILIKE :q)', { q: `%${q.trim()}%` });
+    }
+
+    const [rows, total] = await qb
+      .orderBy('c.item_code', 'ASC')
+      .skip(offset)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      items: rows.map(r => ({
+        itemCode: r.itemCode,
+        itemName: r.itemName,
+        uomCode: r.uomCode ?? undefined,
+        precioUnitario: r.precioUnitario,
+      })),
+      total,
+    };
+  }
+
   /** Total de items en el catálogo — para el dashboard. */
   async contarActivos(empresa: string): Promise<number> {
     return this.repo.count({ where: { empresaCodigo: empresa, activo: true } });

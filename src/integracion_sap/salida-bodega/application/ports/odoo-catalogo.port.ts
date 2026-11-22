@@ -47,6 +47,13 @@ export interface PickingTypeOdoo {
   defaultLocationDestId?: number | null;
 }
 
+export interface ProductoOdooResumen {
+  defaultCode: string;
+  nombre: string;
+  standardPrice: number;
+  qtyAvailable: number;
+}
+
 export interface IOdooCatalogoPort {
   upsertProducto(dto: UpsertProductoDto): Promise<ResultadoUpsert>;
   resolverCategoria(nombreCategoria: string): Promise<number>;
@@ -55,4 +62,5 @@ export interface IOdooCatalogoPort {
   buscarUbicacion(whsCode: string): Promise<number | null>;
   listarUbicacionesInternas(): Promise<UbicacionOdoo[]>;
   listarPickingTypes(): Promise<PickingTypeOdoo[]>;
+  consultarProductosPorCodigos(itemCodes: string[]): Promise<ProductoOdooResumen[]>;
 }

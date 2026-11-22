@@ -229,6 +229,24 @@ export const integracionSapApi = createApi({
       query: (params) => ({ url: '/catalogo/items', params }),
       providesTags: ['Catalogo'],
     }),
+    getComparacionCatalogo: builder.query<
+      {
+        total: number;
+        page: number;
+        limit: number;
+        items: Array<{
+          itemCode: string;
+          itemName: string;
+          uomCode?: string;
+          local: { precio: number | null };
+          odoo: { defaultCode: string; nombre: string; standardPrice: number; qtyAvailable: number } | null;
+        }>;
+      },
+      { q?: string; empresa?: string; page?: number; limit?: number }
+    >({
+      query: (params) => ({ url: '/catalogo/comparacion', params }),
+      providesTags: ['Catalogo'],
+    }),
   }),
 });
 
@@ -255,4 +273,5 @@ export const {
   useGetHistorialQuery,
   useCambiarHojaMutation,
   useGetCatalogoQuery,
+  useGetComparacionCatalogoQuery,
 } = integracionSapApi;

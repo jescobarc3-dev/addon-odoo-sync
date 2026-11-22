@@ -229,4 +229,42 @@ export class IntegracionSapController {
     const total = await this.catalogoService.contarActivos(empresa);
     return { items, total };
   }
+
+  @Get('catalogo/comparacion')
+  @RequirePermiso('integracion-sap:read')
+  @ApiOperation({ summary: 'Catálogo local vs Odoo: precio y stock lado a lado' })
+  async comparacionCatalogo(
+    @Query('q') q?: string,
+    @Query('empresa') empresa = 'DEFAULT',
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page?: number,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit?: number,
+  ) {
+    const pageNum = page ?? 1;
+    const limitNum = limit ?? 50;
+    const offset = (pageNum - 1) * limitNum;
+
+    const { items, total } = await this.catalogoService.buscarPaginado(empresa, q ?? '', limitNum, offset);
+
+    let odooItems: Array<{ defaultCode: string; nombre: string; standardPrice: number; qtyAvailable: number }> = [];
+    try {
+      odooItems = await this.odooCatalogo.consultarProductosPorCodigos(items.map(i => i.itemCode));
+    } catch {
+      // Si Odoo falla, devolvemos los datos locales con odoo=null — sin bloquear la vista
+    }
+
+    const odooMap = new Map(odooItems.map(o => [o.defaultCode, o]));
+
+    return {
+      total,
+      page: pageNum,
+      limit: limitNum,
+      items: items.map(local => ({
+        itemCode: local.itemCode,
+        itemName: local.itemName,
+        uomCode: local.uomCode,
+        local: { precio: local.precioUnitario },
+        odoo: odooMap.get(local.itemCode) ?? null,
+      })),
+    };
+  }
 }

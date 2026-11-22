@@ -10,6 +10,7 @@ import {
   AjusteInventarioDto,
   UbicacionOdoo,
   PickingTypeOdoo,
+  ProductoOdooResumen,
 } from '../../application/ports/odoo-catalogo.port';
 
 type CampoTipo = [string, string | boolean];
@@ -441,6 +442,22 @@ export class OdooCatalogoRpcAdapter implements IOdooCatalogoPort {
     );
     this._ubicacionesCache = (result ?? []).map((r: any) => ({ id: r.id, nombre: r.complete_name }));
     return this._ubicacionesCache;
+  }
+
+  async consultarProductosPorCodigos(itemCodes: string[]): Promise<ProductoOdooResumen[]> {
+    if (itemCodes.length === 0) return [];
+    const result = await this.execute(
+      'product.template',
+      'search_read',
+      [[['default_code', 'in', itemCodes]]],
+      { fields: ['default_code', 'name', 'standard_price', 'qty_available'], limit: itemCodes.length + 10 },
+    );
+    return (result ?? []).map((r: any) => ({
+      defaultCode: r.default_code,
+      nombre: r.name,
+      standardPrice: r.standard_price ?? 0,
+      qtyAvailable: r.qty_available ?? 0,
+    }));
   }
 
   async listarPickingTypes(): Promise<PickingTypeOdoo[]> {
