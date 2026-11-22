@@ -57,6 +57,23 @@ export default function ConfiguracionPage() {
   const [opened, { open, close }] = useDisclosure(false);
   const [editando, setEditando] = useState<string | null>(null);
   const [user, setUser] = useState<{ email: string; rol: string; totpActivo: boolean } | null>(null);
+  const [switchingPortal, setSwitchingPortal] = useState(false);
+
+  const irAlPortal = async () => {
+    setSwitchingPortal(true);
+    try {
+      const res = await apiFetch('/admin/auth/switch-to-portal', { method: 'POST' });
+      if (res.ok) router.push('/integracion-sap/dashboard');
+    } catch (err: any) {
+      notifications.show({
+        color: 'red',
+        title: 'No se pudo acceder al portal',
+        message: err.message ?? 'Asegúrate de tener cuenta activa en el portal.',
+      });
+    } finally {
+      setSwitchingPortal(false);
+    }
+  };
 
   // Estado TOTP
   const [totpModal, { open: openTotp, close: closeTotp }] = useDisclosure(false);
@@ -250,11 +267,9 @@ export default function ConfiguracionPage() {
               Usuarios
             </Button>
           </Link>
-          <Link href="/portal/login">
-            <Button variant="subtle" color="gray" size="xs">
-              Ir al portal →
-            </Button>
-          </Link>
+          <Button variant="subtle" color="gray" size="xs" loading={switchingPortal} onClick={irAlPortal}>
+            Ir al portal →
+          </Button>
           <Button variant="subtle" color="gray" size="xs" onClick={logout}>
             Cerrar sesión
           </Button>
@@ -271,7 +286,7 @@ export default function ConfiguracionPage() {
             { n: '1', txt: 'Configura la conexión de Odoo aquí abajo y pruébala.' },
             { n: '2', txt: 'Ve a "Usuarios" (nav arriba) → "Sincronizar desde Odoo" para importar todas las cuentas.' },
             { n: '3', txt: 'Encuéntrate en la lista → activa tu cuenta → edita permisos y agrégale "admin" (y los demás que necesites).' },
-            { n: '4', txt: 'Haz clic en "Ir al portal →" e ingresa con tus credenciales de Odoo. Eso es todo.' },
+            { n: '4', txt: 'Haz clic en "Ir al portal →". Si tu correo admin coincide con tu usuario de Odoo, entrás directo sin escribir contraseña.' },
           ].map(({ n, txt }) => (
             <Group key={n} gap={10} wrap="nowrap">
               <Box style={{ width: 22, height: 22, borderRadius: '50%', background: '#8B1A1A', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
