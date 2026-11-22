@@ -23,6 +23,8 @@ import {
   IconArrowBarUp,
   IconSettings,
   IconBooks,
+  IconUsers,
+  IconUserPlus,
   IconLogout,
   IconExternalLink,
   IconLink,
@@ -49,6 +51,13 @@ const NAV_SECTIONS = [
       { href: '/integracion-sap/documentos/salidas', label: 'Salidas de mercancía', icon: IconArrowBarUp },
     ],
   },
+  {
+    title: 'RR.HH.',
+    items: [
+      { href: '/integracion-sap/empleados', label: 'Catálogo empleados', icon: IconUsers },
+      { href: '/integracion-sap/empleados/carga', label: 'Cargar archivo', icon: IconUserPlus },
+    ],
+  },
 ];
 
 const PAGE_LABELS: Record<string, string> = {
@@ -56,6 +65,8 @@ const PAGE_LABELS: Record<string, string> = {
   '/integracion-sap/cola': 'Cola de revisión',
   '/integracion-sap/mapeos': 'Mapeos',
   '/integracion-sap/catalogo': 'Catálogo de artículos',
+  '/integracion-sap/empleados/carga': 'Cargar empleados',
+  '/integracion-sap/empleados': 'Catálogo de empleados',
   '/integracion-sap/documentos/inventario-inicial': 'Inventario inicial',
   '/integracion-sap/documentos/actualizacion': 'Actualización inventario',
   '/integracion-sap/documentos/entradas': 'Entradas de mercancía',

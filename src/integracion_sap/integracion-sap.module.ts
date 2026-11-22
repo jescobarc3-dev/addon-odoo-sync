@@ -11,6 +11,7 @@ import { SapLectorSqlAdapter } from './salida-bodega/infrastructure/sap/sap-lect
 import { SapCatalogoSqlAdapter } from './salida-bodega/infrastructure/sap/sap-catalogo-sql.adapter';
 import { OdooInventarioRpcAdapter } from './salida-bodega/infrastructure/odoo/odoo-inventario-rpc.adapter';
 import { OdooCatalogoRpcAdapter } from './salida-bodega/infrastructure/odoo/odoo-catalogo-rpc.adapter';
+import { OdooRRHHRpcAdapter } from './salida-bodega/infrastructure/odoo/odoo-rrhh-rpc.adapter';
 import { SalidaBodegaConsumer } from './salida-bodega/infrastructure/messaging/salida-bodega.consumer';
 import { ProcesarSalidaBodegaUseCase } from './salida-bodega/application/use-cases/procesar-salida-bodega.use-case';
 import { ProcesarInventarioInicialUseCase } from './salida-bodega/application/use-cases/procesar-inventario-inicial.use-case';
@@ -22,12 +23,15 @@ import { DocumentoUploadService } from './documento-parser/documento-upload.serv
 import { HistorialCargaOrmEntity } from './documento-parser/historial-carga.orm-entity';
 import { CatalogoItemOrmEntity } from './documento-parser/catalogo-item.orm-entity';
 import { CatalogoItemService } from './documento-parser/catalogo-item.service';
+import { CatalogoEmpleadoOrmEntity } from './documento-parser/catalogo-empleado.orm-entity';
+import { CatalogoEmpleadoService } from './documento-parser/catalogo-empleado.service';
 import { REGISTRO_SINCRONIZACION_REPOSITORY } from './salida-bodega/domain/repositories/registro-sincronizacion.repository';
 import { MAPEO_ITEM_REPOSITORY } from './salida-bodega/domain/repositories/mapeo-item.repository';
 import { SAP_LECTOR_PORT } from './salida-bodega/application/ports/sap-lector.port';
 import { SAP_CATALOGO_PORT } from './salida-bodega/application/ports/sap-catalogo.port';
 import { ODOO_INVENTARIO_PORT } from './salida-bodega/application/ports/odoo-inventario.port';
 import { ODOO_CATALOGO_PORT } from './salida-bodega/application/ports/odoo-catalogo.port';
+import { ODOO_RRHH_PORT } from './salida-bodega/application/ports/odoo-rrhh.port';
 
 @Module({
   imports: [
@@ -39,6 +43,7 @@ import { ODOO_CATALOGO_PORT } from './salida-bodega/application/ports/odoo-catal
       OdooConexionOrmEntity,
       HistorialCargaOrmEntity,
       CatalogoItemOrmEntity,
+      CatalogoEmpleadoOrmEntity,
     ]),
   ],
   exports: [OdooCredencialesService],
@@ -50,6 +55,7 @@ import { ODOO_CATALOGO_PORT } from './salida-bodega/application/ports/odoo-catal
     { provide: SAP_CATALOGO_PORT, useClass: SapCatalogoSqlAdapter },
     { provide: ODOO_INVENTARIO_PORT, useClass: OdooInventarioRpcAdapter },
     { provide: ODOO_CATALOGO_PORT, useClass: OdooCatalogoRpcAdapter },
+    { provide: ODOO_RRHH_PORT, useClass: OdooRRHHRpcAdapter },
     ProcesarSalidaBodegaUseCase,
     ProcesarInventarioInicialUseCase,
     ProcesarEntradaMercanciaUseCase,
@@ -57,6 +63,7 @@ import { ODOO_CATALOGO_PORT } from './salida-bodega/application/ports/odoo-catal
     OdooCredencialesService,
     ArchivoParserService,
     CatalogoItemService,
+    CatalogoEmpleadoService,
     DocumentoUploadService,
   ],
 })

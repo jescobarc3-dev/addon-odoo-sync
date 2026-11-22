@@ -14,7 +14,9 @@ import { ProcesarSalidaBodegaUseCase } from './salida-bodega/application/use-cas
 import { ProcesarInventarioInicialUseCase } from './salida-bodega/application/use-cases/procesar-inventario-inicial.use-case';
 import { ProcesarEntradaMercanciaUseCase } from './salida-bodega/application/use-cases/procesar-entrada-mercancia.use-case';
 import { ODOO_CATALOGO_PORT, IOdooCatalogoPort } from './salida-bodega/application/ports/odoo-catalogo.port';
+import { ODOO_RRHH_PORT, IOdooRRHHPort } from './salida-bodega/application/ports/odoo-rrhh.port';
 import { CatalogoItemService } from './documento-parser/catalogo-item.service';
+import { CatalogoEmpleadoService } from './documento-parser/catalogo-empleado.service';
 import { DocumentoUploadService } from './documento-parser/documento-upload.service';
 import { JwtPortalGuard } from '../portal/auth/guards/jwt-portal.guard';
 import { PortalPermisosGuard, RequirePermiso } from '../portal/auth/guards/portal-permisos.guard';
@@ -31,10 +33,13 @@ export class IntegracionSapController {
     private readonly mapeoRepo: IMapeoItemRepository,
     @Inject(ODOO_CATALOGO_PORT)
     private readonly odooCatalogo: IOdooCatalogoPort,
+    @Inject(ODOO_RRHH_PORT)
+    private readonly odooRRHH: IOdooRRHHPort,
     private readonly procesarUseCase: ProcesarSalidaBodegaUseCase,
     private readonly procesarInventarioUseCase: ProcesarInventarioInicialUseCase,
     private readonly procesarEntradaUseCase: ProcesarEntradaMercanciaUseCase,
     private readonly catalogoService: CatalogoItemService,
+    private readonly catalogoEmpleadoService: CatalogoEmpleadoService,
     private readonly uploadService: DocumentoUploadService,
   ) {}
 
@@ -228,6 +233,53 @@ export class IntegracionSapController {
     const items = await this.catalogoService.buscar(empresa, q ?? '', limit);
     const total = await this.catalogoService.contarActivos(empresa);
     return { items, total };
+  }
+
+  // ── CATÁLOGO DE EMPLEADOS ────────────────────────────────────────────────
+
+  @Get('empleados/comparacion')
+  @RequirePermiso('integracion-sap:read')
+  @ApiOperation({ summary: 'Catálogo local de empleados vs Odoo HR: comparación lado a lado' })
+  async comparacionEmpleados(
+    @Query('q') q?: string,
+    @Query('empresa') empresa = 'DEFAULT',
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page?: number,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit?: number,
+  ) {
+    const pageNum = page ?? 1;
+    const limitNum = limit ?? 50;
+    const offset = (pageNum - 1) * limitNum;
+
+    const { items, total } = await this.catalogoEmpleadoService.buscarPaginado(empresa, q ?? '', limitNum, offset);
+
+    let odooEmpleados: Array<import('./salida-bodega/application/ports/odoo-rrhh.port').EmpleadoOdooResumen> = [];
+    try {
+      odooEmpleados = await this.odooRRHH.consultarEmpleadosPorCodigos(items.map(e => e.empleadoCodigo));
+    } catch {
+      // Si Odoo falla, devolvemos datos locales con odoo=null
+    }
+
+    const odooMap = new Map(odooEmpleados.map(o => [o.barcode ?? '', o]));
+
+    return {
+      total,
+      page: pageNum,
+      limit: limitNum,
+      items: items.map(local => ({
+        empleadoCodigo: local.empleadoCodigo,
+        nombreCompleto: local.nombreCompleto,
+        departamento: local.departamento,
+        puesto: local.puesto,
+        local: {
+          dpi: local.dpi,
+          correo: local.correoTrabajo,
+          telefono: local.telefono,
+          fechaIngreso: local.fechaIngreso,
+          odooSincEstado: local.odooSincEstado,
+        },
+        odoo: odooMap.get(local.empleadoCodigo) ?? null,
+      })),
+    };
   }
 
   @Get('catalogo/comparacion')

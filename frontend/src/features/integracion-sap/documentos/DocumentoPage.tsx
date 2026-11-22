@@ -90,6 +90,17 @@ const CAMPOS_PICKING = [
   { key: 'uomCode', label: 'Unidad de medida', requerido: false },
 ];
 
+const CAMPOS_EMPLEADOS = [
+  { key: 'empleadoCodigo', label: 'Código de empleado', requerido: true },
+  { key: 'nombreCompleto', label: 'Nombre completo', requerido: true },
+  { key: 'dpi', label: 'DPI / Identificación', requerido: false },
+  { key: 'departamento', label: 'Departamento', requerido: false },
+  { key: 'puesto', label: 'Puesto / Cargo', requerido: false },
+  { key: 'correoTrabajo', label: 'Correo de trabajo', requerido: false },
+  { key: 'telefono', label: 'Teléfono', requerido: false },
+  { key: 'fechaIngreso', label: 'Fecha de ingreso', requerido: false },
+];
+
 const PASOS_DOC: Record<string, Array<{ label: string; sub: string }>> = {
   SALIDA_BODEGA: [
     { label: 'Subir archivo', sub: 'Excel / CSV / PDF' },
@@ -119,6 +130,13 @@ const PASOS_DOC: Record<string, Array<{ label: string; sub: string }>> = {
     { label: 'Ajustar stock', sub: 'stock.quant' },
     { label: 'Aplicado', sub: 'inventario actualizado' },
   ],
+  CARGA_EMPLEADOS: [
+    { label: 'Subir archivo', sub: 'Excel de nóminas' },
+    { label: 'Confirmar mapeo', sub: 'columnas → campos' },
+    { label: 'Buscar en Odoo', sub: 'por código / DPI' },
+    { label: 'Crear / Actualizar', sub: 'hr.employee' },
+    { label: 'Completado', sub: 'empleados sincronizados' },
+  ],
 };
 
 const ACCEPT_TYPES = [
@@ -128,10 +146,13 @@ const ACCEPT_TYPES = [
 
 const SIN_COLUMNA = '— sin asignar —';
 
+const ES_EMPLEADOS = (tipo: string) => tipo === 'CARGA_EMPLEADOS';
+
 export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObjeto }: Props) {
   const esPicking = ES_PICKING(tipo);
-  const mostrarPrecio = !esPicking || tipo === 'ENTRADA_MERCANCIA';
-  const CAMPOS_REQUERIDOS = esPicking ? CAMPOS_PICKING : CAMPOS_INVENTARIO;
+  const esEmpleados = ES_EMPLEADOS(tipo);
+  const mostrarPrecio = !esPicking && !esEmpleados;
+  const CAMPOS_REQUERIDOS = esEmpleados ? CAMPOS_EMPLEADOS : esPicking ? CAMPOS_PICKING : CAMPOS_INVENTARIO;
 
   const { data: me } = useGetMeQuery();
   const puedeCargar = me?.permisos?.includes('integracion-sap:cargar') || me?.permisos?.includes('admin');
@@ -213,7 +234,7 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
 
   const { data: ubicaciones, isFetching: cargandoUbicaciones } = useGetUbicacionesOdooQuery(
     undefined,
-    { skip: !cargarUbicaciones || esPicking },
+    { skip: !cargarUbicaciones || esPicking || esEmpleados },
   );
 
   const tipoOperacionBodega = tipo === 'SALIDA_BODEGA' ? 'SALIDA' : 'ENTRADA';
@@ -317,6 +338,7 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
     : CAMPOS_REQUERIDOS
         .filter(c => {
           if (c.key === 'whsCode') return !whsMapeado && (esPicking ? true : !ubicacionOverrideId);
+          if (esEmpleados) return c.requerido && !mapeoActual[c.key];
           return c.requerido && !mapeoActual[c.key];
         })
         .map(c => c.label);
@@ -334,6 +356,8 @@ export function DocumentoPage({ tipo, titulo, descripcion, colorAccent, odooObje
   const labelCantidad = esPicking ? 'Cantidad' : 'Cantidad / Existencia';
   const labelBoton = esPicking
     ? `Crear picking en Odoo (${uploadState?.totalFilas ?? 0} líneas)`
+    : esEmpleados
+    ? `Sincronizar empleados con Odoo (${uploadState?.totalFilas ?? 0} registros)`
     : `Confirmar mapeo y enviar a Odoo (${uploadState?.totalFilas ?? 0} filas)`;
 
   return (

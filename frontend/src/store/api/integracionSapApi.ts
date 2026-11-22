@@ -75,10 +75,34 @@ export interface HistorialEntry {
   creadoEn: string;
 }
 
+export interface EmpleadoComparacion {
+  empleadoCodigo: string;
+  nombreCompleto: string;
+  departamento: string | null;
+  puesto: string | null;
+  local: {
+    dpi: string | null;
+    correo: string | null;
+    telefono: string | null;
+    fechaIngreso: string | null;
+    odooSincEstado: string | null;
+  };
+  odoo: {
+    id: number;
+    nombre: string;
+    barcode: string | null;
+    ssnid: string | null;
+    departamento: string | null;
+    puesto: string | null;
+    correoTrabajo: string | null;
+    activo: boolean;
+  } | null;
+}
+
 export const integracionSapApi = createApi({
   reducerPath: 'integracionSapApi',
   baseQuery: makeBaseQueryWithReauth('/api/integracion-sap'),
-  tagTypes: ['Registro', 'MapeoItem', 'MapeoBodega', 'Catalogo', 'Historial'],
+  tagTypes: ['Registro', 'MapeoItem', 'MapeoBodega', 'Catalogo', 'Historial', 'Empleado'],
   endpoints: (builder) => ({
     getRegistros: builder.query<
       { items: RegistroSincronizacion[]; total: number },
@@ -232,6 +256,13 @@ export const integracionSapApi = createApi({
       query: (params) => ({ url: '/catalogo/items', params }),
       providesTags: ['Catalogo'],
     }),
+    getComparacionEmpleados: builder.query<
+      { total: number; page: number; limit: number; items: EmpleadoComparacion[] },
+      { q?: string; empresa?: string; page?: number; limit?: number }
+    >({
+      query: (params) => ({ url: '/empleados/comparacion', params }),
+      providesTags: ['Empleado'],
+    }),
     getComparacionCatalogo: builder.query<
       {
         total: number;
@@ -277,4 +308,5 @@ export const {
   useCambiarHojaMutation,
   useGetCatalogoQuery,
   useGetComparacionCatalogoQuery,
+  useGetComparacionEmpleadosQuery,
 } = integracionSapApi;

@@ -6,9 +6,11 @@ import * as XLSX from 'xlsx';
 import { ArchivoParserService, ResultadoParse, aplicarMapeo, FilaInventario } from './archivo-parser.service';
 import { IOdooCatalogoPort, ODOO_CATALOGO_PORT, ItemLote } from '../salida-bodega/application/ports/odoo-catalogo.port';
 import { IOdooInventarioPort, ODOO_INVENTARIO_PORT } from '../salida-bodega/application/ports/odoo-inventario.port';
+import { IOdooRRHHPort, ODOO_RRHH_PORT } from '../salida-bodega/application/ports/odoo-rrhh.port';
 import { IMapeoItemRepository, MAPEO_ITEM_REPOSITORY, TipoOperacionBodega } from '../salida-bodega/domain/repositories/mapeo-item.repository';
 import { HistorialCargaOrmEntity } from './historial-carga.orm-entity';
 import { CatalogoItemService } from './catalogo-item.service';
+import { CatalogoEmpleadoService } from './catalogo-empleado.service';
 
 function calcularDiasHabiles(desde: Date, hasta: Date): number {
   let count = 0;
@@ -72,10 +74,13 @@ export class DocumentoUploadService {
   constructor(
     private readonly parser: ArchivoParserService,
     private readonly catalogo: CatalogoItemService,
+    private readonly catalogoEmpleado: CatalogoEmpleadoService,
     @Inject(ODOO_CATALOGO_PORT)
     private readonly odooCatalogo: IOdooCatalogoPort,
     @Inject(ODOO_INVENTARIO_PORT)
     private readonly odooInventario: IOdooInventarioPort,
+    @Inject(ODOO_RRHH_PORT)
+    private readonly odooRRHH: IOdooRRHHPort,
     @Inject(MAPEO_ITEM_REPOSITORY)
     private readonly mapeoRepo: IMapeoItemRepository,
     @InjectRepository(HistorialCargaOrmEntity)
@@ -434,6 +439,127 @@ export class DocumentoUploadService {
         : null,
       filasValidas,
     );
+  }
+
+  // ── EMPLEADOS (CARGA_EMPLEADOS) ───────────────────────────────────────────
+
+  iniciarJobEmpleados(
+    uploadId: string,
+    mapeoColumnas?: Record<string, string>,
+  ): { jobId: string; total: number } {
+    const sesion = this.obtenerSesion(uploadId);
+    const rawRows = sesion.resultado.rawRows;
+    const total = rawRows.length;
+    const jobId = randomUUID();
+
+    this.jobs.set(jobId, { estado: 'procesando', progreso: 0, total, creadoEn: new Date() });
+
+    const sesionArchivo = sesion._originalname ?? null;
+    this._procesarEmpleadosAsync(jobId, uploadId, mapeoColumnas).catch(async err => {
+      const msg: string = err?.message ?? 'Error inesperado';
+      this.jobs.set(jobId, { estado: 'error', progreso: 0, total, errorMsg: msg, creadoEn: new Date() });
+      this.logger.error(`Job empleados ${jobId} falló: ${msg}`);
+      await this._guardarHistorial('CARGA_EMPLEADOS', sesionArchivo,
+        { procesados: 0, ajustados: 0, sinCambio: 0, errores: 1,
+          detalleErrores: [msg], sinMapeo: [], sinBodega: [], conOnHandCero: [] }, msg);
+    });
+
+    return { jobId, total };
+  }
+
+  private async _procesarEmpleadosAsync(
+    jobId: string,
+    uploadId: string,
+    mapeoColumnas?: Record<string, string>,
+  ): Promise<void> {
+    const sesion = this.obtenerSesion(uploadId);
+    const { empresa, resultado } = sesion;
+    const rawRows = resultado.rawRows;
+    const job = this.jobs.get(jobId)!;
+
+    const getStr = (row: Record<string, any>, campo: string): string => {
+      const col = mapeoColumnas?.[campo];
+      if (!col) return '';
+      const val = row[col];
+      return val != null ? String(val).trim() : '';
+    };
+
+    const detalleErrores: string[] = [];
+    const empleadosParaCatalogo: import('./catalogo-empleado.service').EmpleadoCatalogo[] = [];
+    let ajustados = 0;
+    let sinCambio = 0;
+
+    for (let i = 0; i < rawRows.length; i++) {
+      const row = rawRows[i];
+      const empleadoCodigo = getStr(row, 'empleadoCodigo');
+      const nombreCompleto = getStr(row, 'nombreCompleto');
+
+      if (!empleadoCodigo || !nombreCompleto) continue;
+
+      const dpi = getStr(row, 'dpi') || null;
+      const departamento = getStr(row, 'departamento') || null;
+      const puesto = getStr(row, 'puesto') || null;
+      const correoTrabajo = getStr(row, 'correoTrabajo') || null;
+      const telefono = getStr(row, 'telefono') || null;
+      const fechaIngreso = getStr(row, 'fechaIngreso') || null;
+
+      const dto = { nombreCompleto, empleadoCodigo, dpi, departamento, puesto, correoTrabajo, telefono, fechaIngreso };
+
+      let odooEmployeeId: number | null = null;
+      let odooSincEstado: string | null = null;
+      let odooSincError: string | null = null;
+
+      try {
+        const existeId = await this.odooRRHH.buscarEmpleado(empleadoCodigo, dpi);
+        if (existeId) {
+          await this.odooRRHH.actualizarEmpleado(existeId, dto);
+          odooEmployeeId = existeId;
+          odooSincEstado = 'actualizado';
+          ajustados++;
+        } else {
+          odooEmployeeId = await this.odooRRHH.crearEmpleado(dto);
+          odooSincEstado = 'creado';
+          ajustados++;
+        }
+      } catch (err: any) {
+        odooSincEstado = 'error';
+        odooSincError = err?.message ?? 'Error desconocido';
+        detalleErrores.push(`${empleadoCodigo} (${nombreCompleto}): ${odooSincError}`);
+      }
+
+      empleadosParaCatalogo.push({
+        empleadoCodigo, nombreCompleto, dpi, departamento, puesto,
+        correoTrabajo, telefono, fechaIngreso,
+        odooEmployeeId, odooSincEstado, odooSincError,
+      });
+
+      job.progreso = i + 1;
+      this.jobs.set(jobId, job);
+    }
+
+    if (empleadosParaCatalogo.length > 0) {
+      await this.catalogoEmpleado.upsertLote(empresa, empleadosParaCatalogo);
+    }
+
+    const resultadoFinal: ResultadoProcesamiento = {
+      procesados: empleadosParaCatalogo.length,
+      ajustados,
+      sinCambio,
+      errores: detalleErrores.length,
+      detalleErrores,
+      sinMapeo: [],
+      sinBodega: [],
+      conOnHandCero: [],
+    };
+
+    job.progreso = job.total;
+    job.estado = 'completado';
+    job.resultado = resultadoFinal;
+    this.jobs.set(jobId, job);
+    this.sesiones.delete(uploadId);
+
+    this.logger.log(`Job empleados ${jobId} completado: ${ajustados} sincronizados, ${detalleErrores.length} errores`);
+    await this._guardarHistorial('CARGA_EMPLEADOS', sesion._originalname ?? null, resultadoFinal, null);
   }
 
   // ── Historial ─────────────────────────────────────────────────────────────

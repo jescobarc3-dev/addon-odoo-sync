@@ -10,7 +10,7 @@ import { memoryStorage } from 'multer';
 import { JwtPortalGuard } from '../../portal/auth/guards/jwt-portal.guard';
 import { PortalPermisosGuard, RequirePermiso } from '../../portal/auth/guards/portal-permisos.guard';
 
-const TIPO_VALIDOS = ['INVENTARIO_INICIAL', 'ACTUALIZACION_INVENTARIO', 'SALIDA_BODEGA', 'ENTRADA_MERCANCIA'];
+const TIPO_VALIDOS = ['INVENTARIO_INICIAL', 'ACTUALIZACION_INVENTARIO', 'SALIDA_BODEGA', 'ENTRADA_MERCANCIA', 'CARGA_EMPLEADOS'];
 const MAX_SIZE_MB = 20;
 
 @ApiTags('documento-upload')
@@ -82,6 +82,9 @@ export class DocumentoUploadController {
         body.referenciaSap,
         body.whsCodeOverride,
       );
+    }
+    if (tipo === 'CARGA_EMPLEADOS') {
+      return this.uploadService.iniciarJobEmpleados(uploadId, body.mapeoColumnas);
     }
     throw new BadRequestException(`Tipo "${tipo}" no soportado aún en este endpoint.`);
   }
