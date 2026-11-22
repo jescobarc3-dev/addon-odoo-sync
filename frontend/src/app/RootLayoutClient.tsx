@@ -39,7 +39,13 @@ const NAV_SECTIONS = [
       { href: '/integracion-sap/dashboard', label: 'Dashboard', icon: IconLayoutDashboard },
       { href: '/integracion-sap/cola', label: 'Cola de revisión', icon: IconClipboardList },
       { href: '/integracion-sap/mapeos', label: 'Mapeos', icon: IconTag },
-      { href: '/integracion-sap/catalogo', label: 'Catálogo', icon: IconBooks },
+    ],
+  },
+  {
+    title: 'Catálogos',
+    items: [
+      { href: '/integracion-sap/catalogo', label: 'Artículos', icon: IconBooks },
+      { href: '/integracion-sap/empleados', label: 'Empleados', icon: IconUsers },
     ],
   },
   {
@@ -49,13 +55,7 @@ const NAV_SECTIONS = [
       { href: '/integracion-sap/documentos/actualizacion', label: 'Actualización inventario', icon: IconRefresh },
       { href: '/integracion-sap/documentos/entradas', label: 'Entradas de mercancía', icon: IconArrowBarDown },
       { href: '/integracion-sap/documentos/salidas', label: 'Salidas de mercancía', icon: IconArrowBarUp },
-    ],
-  },
-  {
-    title: 'RR.HH.',
-    items: [
-      { href: '/integracion-sap/empleados', label: 'Catálogo empleados', icon: IconUsers },
-      { href: '/integracion-sap/empleados/carga', label: 'Cargar archivo', icon: IconUserPlus },
+      { href: '/integracion-sap/empleados/carga', label: 'Carga de empleados', icon: IconUserPlus },
     ],
   },
 ];
