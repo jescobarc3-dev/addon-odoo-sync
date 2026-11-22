@@ -27,15 +27,8 @@ import {
   IconExternalLink,
   IconLink,
 } from '@tabler/icons-react';
-import { DM_Sans } from 'next/font/google';
 import { useGetMeQuery, useLogoutMutation, useGenerarEnlaceMutation } from '@/store/api/portalApi';
 import { notifications } from '@mantine/notifications';
-
-const dmSans = DM_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-dm-sans',
-});
 
 const NAV_SECTIONS = [
   {
@@ -279,15 +272,11 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 export default function RootLayoutClient({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={dmSans.variable}>
-      <body>
-        <Provider store={store}>
-          <MantineProvider theme={theme}>
-            <Notifications position="top-right" />
-            <Shell>{children}</Shell>
-          </MantineProvider>
-        </Provider>
-      </body>
-    </html>
+    <Provider store={store}>
+      <MantineProvider theme={theme}>
+        <Notifications position="top-right" />
+        <Shell>{children}</Shell>
+      </MantineProvider>
+    </Provider>
   );
 }
