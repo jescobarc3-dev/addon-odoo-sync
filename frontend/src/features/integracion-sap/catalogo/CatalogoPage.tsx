@@ -74,7 +74,7 @@ function SortTh({
 }
 
 type FiltroOdoo = 'todos' | 'en_odoo' | 'no_odoo';
-type FiltroDif = 'todos' | 'igual' | 'con_dif' | 'addon_cero' | 'sin_precio';
+type FiltroDif = 'todos' | 'igual' | 'con_dif' | 'addon_cero' | 'sin_precio' | 'con_stock' | 'sin_stock';
 
 export function CatalogoPage() {
   const [q, setQ] = useState('');
@@ -129,6 +129,10 @@ export function CatalogoPage() {
       arr = arr.filter(i => i.local.precio != null && toNum(i.local.precio) === 0);
     } else if (filtroDif === 'sin_precio') {
       arr = arr.filter(i => i.local.precio == null);
+    } else if (filtroDif === 'con_stock') {
+      arr = arr.filter(i => i.odoo != null && toNum(i.odoo.qtyAvailable) > 0);
+    } else if (filtroDif === 'sin_stock') {
+      arr = arr.filter(i => i.odoo != null && toNum(i.odoo.qtyAvailable) === 0);
     }
 
     // Sort
@@ -218,9 +222,11 @@ export function CatalogoPage() {
             onChange={v => setFiltroDif((v ?? 'todos') as FiltroDif)}
             style={{ width: 190 }}
             data={[
-              { label: 'Todas las diferencias', value: 'todos' },
+              { label: 'Todos', value: 'todos' },
+              { label: 'Con stock en Odoo', value: 'con_stock' },
+              { label: 'Sin stock en Odoo', value: 'sin_stock' },
               { label: 'Precio igual', value: 'igual' },
-              { label: 'Con diferencia', value: 'con_dif' },
+              { label: 'Con diferencia de precio', value: 'con_dif' },
               { label: 'Precio addon Q0', value: 'addon_cero' },
               { label: 'Sin precio en addon', value: 'sin_precio' },
             ]}
