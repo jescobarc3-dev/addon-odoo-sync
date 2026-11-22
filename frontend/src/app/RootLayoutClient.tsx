@@ -49,13 +49,17 @@ const NAV_SECTIONS = [
     ],
   },
   {
+    title: 'Cargas de datos',
+    items: [
+      { href: '/integracion-sap/documentos/actualizacion', label: 'Inventario de artículos', icon: IconPackage },
+      { href: '/integracion-sap/empleados/carga', label: 'Nómina de empleados', icon: IconUserPlus },
+    ],
+  },
+  {
     title: 'Documentos SAP',
     items: [
-      { href: '/integracion-sap/documentos/inventario-inicial', label: 'Inventario inicial', icon: IconPackage },
-      { href: '/integracion-sap/documentos/actualizacion', label: 'Actualización inventario', icon: IconRefresh },
       { href: '/integracion-sap/documentos/entradas', label: 'Entradas de mercancía', icon: IconArrowBarDown },
       { href: '/integracion-sap/documentos/salidas', label: 'Salidas de mercancía', icon: IconArrowBarUp },
-      { href: '/integracion-sap/empleados/carga', label: 'Carga de empleados', icon: IconUserPlus },
     ],
   },
 ];
@@ -64,11 +68,11 @@ const PAGE_LABELS: Record<string, string> = {
   '/integracion-sap/dashboard': 'Dashboard',
   '/integracion-sap/cola': 'Cola de revisión',
   '/integracion-sap/mapeos': 'Mapeos',
-  '/integracion-sap/catalogo': 'Catálogo de artículos',
-  '/integracion-sap/empleados/carga': 'Cargar empleados',
-  '/integracion-sap/empleados': 'Catálogo de empleados',
-  '/integracion-sap/documentos/inventario-inicial': 'Inventario inicial',
-  '/integracion-sap/documentos/actualizacion': 'Actualización inventario',
+  '/integracion-sap/catalogo': 'Artículos',
+  '/integracion-sap/empleados/carga': 'Nómina de empleados',
+  '/integracion-sap/empleados': 'Empleados',
+  '/integracion-sap/documentos/inventario-inicial': 'Inventario de artículos',
+  '/integracion-sap/documentos/actualizacion': 'Inventario de artículos',
   '/integracion-sap/documentos/entradas': 'Entradas de mercancía',
   '/integracion-sap/documentos/salidas': 'Salidas de mercancía',
   '/admin/configuracion': 'Configuración',
