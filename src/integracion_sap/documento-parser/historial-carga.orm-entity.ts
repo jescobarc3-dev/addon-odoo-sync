@@ -57,7 +57,7 @@ export class HistorialCargaOrmEntity {
   @Column({ name: 'archivo_original', type: 'bytea', nullable: true, select: false })
   archivoOriginal: Buffer | null;
 
-  @Column({ name: 'archivo_original_mimetype', length: 50, nullable: true })
+  @Column({ name: 'archivo_original_mimetype', length: 150, nullable: true })
   archivoOriginalMimetype: string | null;
 
   @CreateDateColumn({ name: 'creado_en', type: 'timestamptz' })

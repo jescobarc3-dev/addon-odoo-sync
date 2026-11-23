@@ -27,9 +27,15 @@ export class CatalogoItemService {
   async upsertLote(empresa: string, items: ItemCatalogo[]): Promise<void> {
     if (items.length === 0) return;
 
+    // El Excel puede tener el mismo artículo en varios almacenes; PostgreSQL no admite
+    // ON CONFLICT DO UPDATE sobre la misma fila dos veces en un batch → deduplicar.
+    const deduped = Array.from(
+      items.reduce((m, it) => m.set(it.itemCode, it), new Map<string, ItemCatalogo>()).values(),
+    );
+
     const CHUNK = 500;
-    for (let i = 0; i < items.length; i += CHUNK) {
-      const chunk = items.slice(i, i + CHUNK);
+    for (let i = 0; i < deduped.length; i += CHUNK) {
+      const chunk = deduped.slice(i, i + CHUNK);
       await this.repo
         .createQueryBuilder()
         .insert()
