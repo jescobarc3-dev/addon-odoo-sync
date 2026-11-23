@@ -28,9 +28,21 @@ export class CatalogoItemService {
     if (items.length === 0) return;
 
     // El Excel puede tener el mismo artículo en varios almacenes; PostgreSQL no admite
-    // ON CONFLICT DO UPDATE sobre la misma fila dos veces en un batch → deduplicar.
+    // ON CONFLICT DO UPDATE sobre la misma fila dos veces en un batch → deduplicar
+    // acumulando la cantidad total a través de todas las bodegas.
     const deduped = Array.from(
-      items.reduce((m, it) => m.set(it.itemCode, it), new Map<string, ItemCatalogo>()).values(),
+      items.reduce((m, it) => {
+        const prev = m.get(it.itemCode);
+        if (prev) {
+          m.set(it.itemCode, {
+            ...it,
+            cantidadSap: (prev.cantidadSap ?? 0) + (it.cantidadSap ?? 0),
+          });
+        } else {
+          m.set(it.itemCode, it);
+        }
+        return m;
+      }, new Map<string, ItemCatalogo>()).values(),
     );
 
     const CHUNK = 500;
