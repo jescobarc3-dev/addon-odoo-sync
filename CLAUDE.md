@@ -1,7 +1,46 @@
-# CLAUDE.md — integracion_sap (réplica de salidas SAP → Odoo)
+# CLAUDE.md — pt-sync (integración SAP → Odoo + centralizador de catálogos)
 
-## Sobre este contexto
-Bounded context nuevo dentro del monorepo NestJS de `archivo_bodega`. Replica
+## Qué es este addon
+
+**pt-sync** es un middleware de integración entre múltiples fuentes de datos y Odoo 18, desarrollado para **Protección Total**. Nació como réplica de salidas de inventario SAP → Odoo, pero ha evolucionado en un **centralizador de catálogos**: cualquier fuente externa (SAP, sistema de nóminas, Excel ad-hoc) puede cargar datos hacia Odoo de forma ordenada, trazable e idempotente.
+
+### Qué hace hoy
+
+| Módulo | Qué resuelve |
+|---|---|
+| **Catálogo de artículos** | Centraliza el catálogo de productos entre SAP y Odoo. Muestra precio y stock lado a lado, detecta diferencias, alerta si lleva más de 5 días hábiles sin actualizar. |
+| **Inventario de artículos** | Carga Excel exportado de SAP (inicial o actualización). Detecta columnas automáticamente, mapea a `product.template` y ajusta `stock.quant` en Odoo. |
+| **Entradas y salidas de mercancía** | Procesa PDFs o Excels de movimientos físicos de SAP (entradas/salidas). Crea y valida `stock.picking` en Odoo, idempotente por número de documento. |
+| **Catálogo de empleados** | Centraliza el catálogo de empleados entre el sistema de nóminas y Odoo HR. Muestra estado de sincronización por persona. |
+| **Nómina de empleados** | Carga Excel del sistema de nóminas. Crea o actualiza `hr.employee` en Odoo, crea departamentos automáticamente si no existen. Match por código de empleado (`barcode`) y DPI (`ssnid`). |
+| **Cola de revisión** | Registros que fallaron (mapeo, stock insuficiente, error SAP) quedan en cola accionable para revisión manual y reproceso. |
+| **Historial de cargas** | Cada carga guarda el archivo original (PDF o Excel tal como fue subido) y el Excel de datos parseados. Dos botones de descarga independientes. |
+
+### Por qué un middleware y no Odoo directo
+
+Odoo es el **sistema de registro**. pt-sync es el **sistema de integración**. Son roles distintos:
+- Odoo no puede parsear PDFs de SAP con layout variable ni detectar columnas de Excel automáticamente.
+- La lógica de transformación (código SAP → producto Odoo, WhsCode → ubicación, DPI → empleado) es del negocio, no de Odoo.
+- La conexión directa a SAP SQL Server es compleja operacionalmente; por ahora la carga por archivo es la fuente — la arquitectura ya tiene el puerto `ISapLectorPort` para cuando se conecte directamente.
+- Cambios en Odoo (upgrades, nuevos campos) solo tocan los adapters, no la lógica de negocio.
+
+### Como centralizador de catálogos
+
+El patrón está diseñado para escalar a cualquier fuente → Odoo:
+
+```
+SAP (Excel/SQL directo) ──┐
+Sistema de nóminas         ├──► pt-sync ──► Odoo (productos, stock, empleados, HR)
+Exceles manuales ──────────┘
+Futuras fuentes ───────────┘
+```
+
+Cada fuente tiene su propio tipo de documento, su propio parser y su propio adapter de Odoo. El historial, la cola de errores y los catálogos comparativos son transversales a todas las fuentes.
+
+---
+
+## Sobre este contexto (original)
+Bounded context dentro del monorepo NestJS de `archivo_bodega`. Replica
 **salidas de inventario de SAP Business One hacia Odoo 18** como `stock.picking`
 validados, para que el addon de flota (`pt_compras_tier_dynamic`, cliente
 **Protección Total**) pueda consumir la salida y costear el servicio del vehículo
