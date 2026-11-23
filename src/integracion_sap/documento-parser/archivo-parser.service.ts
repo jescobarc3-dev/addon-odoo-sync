@@ -180,8 +180,17 @@ export class ArchivoParserService {
       };
     }
 
-    const headers = Object.keys(rawRows[0]).map(h => h.trim());
+    // Normalizar claves de rawRows (trim) para que coincidan con los headers detectados.
+    // XLSX.js a veces devuelve claves con espacios al final; sin esto el lookup falla.
+    const rawRowsNorm = rawRows.map(row => {
+      const r: Record<string, any> = {};
+      for (const [k, v] of Object.entries(row)) r[k.trim()] = v;
+      return r;
+    });
+
+    const headers = Object.keys(rawRowsNorm[0]);
     const mapa = this.detectarColumnas(headers);
+    this.logger.log(`Columnas detectadas: ${JSON.stringify(mapa)}`);
     const advertencias: string[] = [];
 
     if (hojas.length > 1) {
@@ -194,10 +203,10 @@ export class ArchivoParserService {
       }
     }
 
-    const filas = aplicarMapeo(rawRows, mapa);
+    const filas = aplicarMapeo(rawRowsNorm, mapa);
     this.logger.log(`Excel parseado: hoja="${hojaActual}", ${filas.length} filas`);
 
-    return { filas, rawRows, columnasDetectadas: mapa, headersDisponibles: headers, advertencias, totalFilas: filas.length, hojas, hojaActual };
+    return { filas, rawRows: rawRowsNorm, columnasDetectadas: mapa, headersDisponibles: headers, advertencias, totalFilas: filas.length, hojas, hojaActual };
   }
 
   // ── PDF parser con pdfjs-dist (extracción posicional) ─────────────────────
