@@ -64,14 +64,13 @@ export class CatalogoItemService {
           })),
         )
         .orUpdate(
-          ['item_name', 'uom_code', 'precio_unitario', 'cantidad_sap', 'activo', 'actualizado_en'],
+          ['item_name', 'uom_code', 'precio_unitario', 'cantidad_sap', 'activo'],
           ['empresa_codigo', 'item_code'],
-          { skipUpdateIfNoValuesChanged: true },
         )
         .execute();
     }
 
-    this.logger.log(`Catálogo upsert: ${items.length} items empresa=${empresa}`);
+    this.logger.log(`Catálogo upsert: ${items.length} items → ${deduped.length} únicos empresa=${empresa}`);
   }
 
   /** Búsqueda exacta por código — para validar/corregir el parser. */
