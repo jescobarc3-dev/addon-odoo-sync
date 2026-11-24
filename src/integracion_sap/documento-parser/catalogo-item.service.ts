@@ -177,4 +177,9 @@ export class CatalogoItemService {
   async contarActivos(empresa: string): Promise<number> {
     return this.repo.count({ where: { empresaCodigo: empresa, activo: true } });
   }
+
+  /** Marca todos los items de la empresa como inactivos. Llamar antes de upsertLote para que el catálogo refleje solo la carga más reciente. */
+  async desactivarTodos(empresa: string): Promise<void> {
+    await this.repo.update({ empresaCodigo: empresa, activo: true }, { activo: false });
+  }
 }

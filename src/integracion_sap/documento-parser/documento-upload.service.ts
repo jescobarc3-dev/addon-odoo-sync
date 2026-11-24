@@ -251,18 +251,25 @@ export class DocumentoUploadService {
     this.logger.log(`Job ${jobId} completado: ${loteResult.ajustados} ajustados, ${loteResult.sinCambio} sin cambio`);
     await this._guardarHistorial(sesion.tipo, sesion._originalname ?? null, resultadoFinal, null, filasValidas, sesion._buffer, sesion._mimetype);
 
-    // Poblar catálogo local con los items de esta carga (INVENTARIO_INICIAL o ACTUALIZACION_INVENTARIO)
-    // Permite al parser PDF validar códigos en cargas futuras sin conectar a SAP ni Odoo.
-    this.catalogo.upsertLote(
-      empresa,
-      filasValidas.map(f => ({
-        itemCode: f.itemCode,
-        itemName: f.itemName,
-        uomCode: f.uomCode || undefined,
-        precioUnitario: f.precioUnitario ?? null,
-        cantidadSap: f.onHand ?? null,
-      })),
-    ).catch(e => this.logger.warn(`Catalogo upsert falló (no crítico): ${e.message}`));
+    // Poblar catálogo local con los items de esta carga. Deactivar primero para que el catálogo
+    // refleje solo esta carga (evita que items de cargas anteriores se acumulen indefinidamente).
+    (async () => {
+      try {
+        await this.catalogo.desactivarTodos(empresa);
+        await this.catalogo.upsertLote(
+          empresa,
+          filasValidas.map(f => ({
+            itemCode: f.itemCode,
+            itemName: f.itemName,
+            uomCode: f.uomCode || undefined,
+            precioUnitario: f.precioUnitario ?? null,
+            cantidadSap: f.onHand ?? null,
+          })),
+        );
+      } catch (e: any) {
+        this.logger.warn(`Catalogo upsert falló (no crítico): ${e.message}`);
+      }
+    })();
   }
 
   // ── PICKING (SALIDA_BODEGA / ENTRADA_MERCANCIA) ───────────────────────────
