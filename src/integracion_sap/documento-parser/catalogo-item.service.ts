@@ -168,6 +168,7 @@ export class CatalogoItemService {
         itemName: r.itemName,
         uomCode: r.uomCode ?? undefined,
         precioUnitario: r.precioUnitario,
+        cantidadSap: r.cantidadSap,
       })),
       total,
     };

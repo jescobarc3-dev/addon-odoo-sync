@@ -181,6 +181,9 @@ export class DocumentoUploadService {
     this.logger.log(`Job ${jobId}: ${filas.length} filas — modo lote`);
 
     const filasValidas = filas.filter(f => !!f.itemCode);
+    if (filasValidas.length < filas.length) {
+      this.logger.warn(`Job ${jobId}: ${filas.length - filasValidas.length} filas descartadas por itemCode vacío: fila(s) ${filas.filter(f => !f.itemCode).map(f => f.filaOriginal).join(', ')}`);
+    }
     const locationIds = await Promise.all(
       filasValidas.map(async fila => {
         if (ubicacionOverrideId) return { fila, locationId: ubicacionOverrideId };
