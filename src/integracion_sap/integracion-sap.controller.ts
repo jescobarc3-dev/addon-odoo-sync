@@ -376,6 +376,7 @@ export class IntegracionSapController {
   async catalogoUbicaciones(
     @Query('empresa') empresa = 'DEFAULT',
     @Query('q') q?: string,
+    @Query('cliente') cliente?: string,
     @Query('area') area?: string,
     @Query('industria') industria?: string,
     @Query('departamento') departamento?: string,
@@ -386,6 +387,7 @@ export class IntegracionSapController {
   ) {
     return this.catalogoUbicacionService.buscarPaginado(empresa, {
       q,
+      cliente,
       area,
       industria,
       departamento,

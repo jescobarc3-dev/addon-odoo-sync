@@ -287,11 +287,12 @@ export const integracionSapApi = createApi({
       {
         items: any[];
         total: number;
-        filtros: { areas: string[]; industrias: string[]; departamentos: string[]; facturaciones: string[] };
+        filtros: { clientes: string[]; areas: string[]; industrias: string[]; departamentos: string[]; facturaciones: string[] };
       },
       {
         empresa?: string;
         q?: string;
+        cliente?: string;
         area?: string;
         industria?: string;
         departamento?: string;

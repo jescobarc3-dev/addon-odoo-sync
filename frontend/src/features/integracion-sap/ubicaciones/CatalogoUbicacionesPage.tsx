@@ -26,6 +26,7 @@ const LABEL_FACTURACION: Record<string, string> = {
 export function CatalogoUbicacionesPage() {
   const [empresa] = useState('DEFAULT');
   const [q, setQ] = useState('');
+  const [cliente, setCliente] = useState<string | null>(null);
   const [area, setArea] = useState<string | null>(null);
   const [industria, setIndustria] = useState<string | null>(null);
   const [depto, setDepto] = useState<string | null>(null);
@@ -36,6 +37,7 @@ export function CatalogoUbicacionesPage() {
   const { data, isLoading } = useGetCatalogoUbicacionesQuery({
     empresa,
     q: q || undefined,
+    cliente: cliente || undefined,
     area: area || undefined,
     industria: industria || undefined,
     departamento: depto || undefined,
@@ -50,7 +52,7 @@ export function CatalogoUbicacionesPage() {
   const filtros = data?.filtros;
 
   const limpiarFiltros = () => {
-    setQ(''); setArea(null); setIndustria(null);
+    setQ(''); setCliente(null); setArea(null); setIndustria(null);
     setDepto(null); setFacturacion(null); setSoloProblemas(false);
     setPage(1);
   };
@@ -134,6 +136,15 @@ export function CatalogoUbicacionesPage() {
           w={260}
         />
         <Select
+          placeholder="Cliente / Grupo"
+          data={filtros?.clientes?.map((c: string) => ({ value: c, label: c })) ?? []}
+          value={cliente}
+          onChange={(v) => { setCliente(v); setPage(1); }}
+          clearable
+          searchable
+          w={220}
+        />
+        <Select
           placeholder="Área / Distrito"
           data={filtros?.areas?.map((a: string) => ({ value: a, label: a })) ?? []}
           value={area}
@@ -174,7 +185,7 @@ export function CatalogoUbicacionesPage() {
         >
           Solo con issues
         </Badge>
-        {(q || area || industria || depto || facturacion || soloProblemas) && (
+        {(q || cliente || area || industria || depto || facturacion || soloProblemas) && (
           <Badge
             variant="outline" color="gray" style={{ cursor: 'pointer' }}
             onClick={limpiarFiltros}

@@ -455,6 +455,7 @@ export class CatalogoUbicacionService {
     empresa: string,
     opts: {
       q?: string;
+      cliente?: string;
       area?: string;
       industria?: string;
       departamento?: string;
@@ -479,6 +480,7 @@ export class CatalogoUbicacionService {
         { q },
       );
     }
+    if (opts.cliente) qb.andWhere('u.cliente = :cliente', { cliente: opts.cliente });
     if (opts.area) qb.andWhere('u.area = :area', { area: opts.area });
     if (opts.industria) qb.andWhere('u.industria = :industria', { industria: opts.industria });
     if (opts.departamento) qb.andWhere('u.departamento = :departamento', { departamento: opts.departamento });
@@ -501,17 +503,18 @@ export class CatalogoUbicacionService {
   private async _getFiltros(empresa: string): Promise<Record<string, string[]>> {
     const rows = await this.repo
       .createQueryBuilder('u')
-      .select(['u.area', 'u.industria', 'u.departamento', 'u.facturacion'])
+      .select(['u.cliente', 'u.area', 'u.industria', 'u.departamento', 'u.facturacion'])
       .where('u.empresa_codigo = :empresa AND u.activo = true', { empresa })
       .distinct(true)
       .getRawMany();
 
+    const clientes = [...new Set(rows.map(r => r.u_cliente).filter(Boolean))].sort();
     const areas = [...new Set(rows.map(r => r.u_area).filter(Boolean))].sort();
     const industrias = [...new Set(rows.map(r => r.u_industria).filter(Boolean))].sort();
     const departamentos = [...new Set(rows.map(r => r.u_departamento).filter(Boolean))].sort();
     const facturaciones = [...new Set(rows.map(r => r.u_facturacion).filter(Boolean))].sort();
 
-    return { areas, industrias, departamentos, facturaciones };
+    return { clientes, areas, industrias, departamentos, facturaciones };
   }
 
   async contarActivos(empresa: string): Promise<{ total: number; conProblemas: number; scorePromedio: number }> {
