@@ -23,6 +23,7 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 # Copiar node_modules ya depurados del builder (sin devDeps, sin segundo npm ci)
+COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
 # Reemplazar pdfjs-dist gordo por solo los 2 archivos runtime
 COPY --from=builder /pdfjs-slim ./node_modules/pdfjs-dist
