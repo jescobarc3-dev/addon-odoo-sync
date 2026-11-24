@@ -42,7 +42,7 @@ function DifBadge({ localPrecio, odooPrecio }: { localPrecio: any; odooPrecio: a
   if (localPrecio == null || odooPrecio == null) return null;
   const dif = difPct(localPrecio, odooPrecio);
   if (dif === null) return null;
-  if (dif === 0) return <Badge size="xs" color="green" variant="light">Igual</Badge>;
+  if (dif < 0.001) return <Badge size="xs" color="green" variant="light">Igual</Badge>;
   if (dif === Infinity) return <Badge size="xs" color="orange" variant="light">Addon Q0</Badge>;
   if (dif < 0.05) return <Badge size="xs" color="yellow" variant="light">&lt;5%</Badge>;
   return <Badge size="xs" color="red" variant="light">{(dif * 100).toFixed(0)}% dif</Badge>;
