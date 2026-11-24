@@ -25,6 +25,7 @@ import {
   IconBooks,
   IconUsers,
   IconUserPlus,
+  IconMapPin,
   IconLogout,
   IconExternalLink,
   IconLink,
@@ -46,6 +47,7 @@ const NAV_SECTIONS = [
     items: [
       { href: '/integracion-sap/catalogo', label: 'Artículos', icon: IconBooks },
       { href: '/integracion-sap/empleados', label: 'Empleados', icon: IconUsers },
+      { href: '/integracion-sap/ubicaciones', label: 'Ubicaciones', icon: IconMapPin },
     ],
   },
   {
@@ -53,6 +55,7 @@ const NAV_SECTIONS = [
     items: [
       { href: '/integracion-sap/documentos/actualizacion', label: 'Inventario de artículos', icon: IconPackage },
       { href: '/integracion-sap/empleados/carga', label: 'Nómina de empleados', icon: IconUserPlus },
+      { href: '/integracion-sap/ubicaciones/carga', label: 'Carga de ubicaciones', icon: IconMapPin },
     ],
   },
   {
@@ -75,6 +78,8 @@ const PAGE_LABELS: Record<string, string> = {
   '/integracion-sap/documentos/actualizacion': 'Inventario de artículos',
   '/integracion-sap/documentos/entradas': 'Entradas de mercancía',
   '/integracion-sap/documentos/salidas': 'Salidas de mercancía',
+  '/integracion-sap/ubicaciones': 'Ubicaciones',
+  '/integracion-sap/ubicaciones/carga': 'Carga de ubicaciones',
   '/admin/configuracion': 'Configuración',
 };
 

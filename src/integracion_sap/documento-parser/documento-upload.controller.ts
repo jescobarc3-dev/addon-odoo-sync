@@ -6,6 +6,7 @@ import { Response, Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { DocumentoUploadService } from './documento-upload.service';
+import { CatalogoUbicacionService } from './catalogo-ubicacion.service';
 import { memoryStorage } from 'multer';
 import { JwtPortalGuard } from '../../portal/auth/guards/jwt-portal.guard';
 import { PortalPermisosGuard, RequirePermiso } from '../../portal/auth/guards/portal-permisos.guard';
@@ -17,7 +18,10 @@ const MAX_SIZE_MB = 20;
 @Controller('integracion-sap/documentos')
 @UseGuards(JwtPortalGuard, PortalPermisosGuard)
 export class DocumentoUploadController {
-  constructor(private readonly uploadService: DocumentoUploadService) {}
+  constructor(
+    private readonly uploadService: DocumentoUploadService,
+    private readonly ubicacionService: CatalogoUbicacionService,
+  ) {}
 
   @Post(':tipo/upload')
   @RequirePermiso('integracion-sap:cargar')
@@ -133,5 +137,47 @@ export class DocumentoUploadController {
       'Content-Length': buffer.length,
     });
     res.end(buffer);
+  }
+
+  // ── CATÁLOGO DE UBICACIONES ───────────────────────────────────────────────
+
+  @Post('ubicaciones/upload')
+  @RequirePermiso('integracion-sap:cargar')
+  @ApiOperation({
+    summary: 'Cargar Excel de puestos/ubicaciones. Aplica normalización y calcula score de calidad de datos.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+        empresa: { type: 'string', description: 'Código de empresa (default: DEFAULT)' },
+      },
+    },
+  })
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async uploadUbicaciones(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('empresa') empresa?: string,
+  ) {
+    if (!file) throw new BadRequestException('No se recibió ningún archivo');
+    if (file.size > 30 * 1024 * 1024) throw new BadRequestException('El archivo supera 30 MB');
+
+    const empresaCodigo = empresa?.trim() || 'DEFAULT';
+    const { ubicaciones, resumen } = this.ubicacionService.parsearExcel(file.buffer);
+
+    if (ubicaciones.length === 0) {
+      throw new BadRequestException('No se encontraron puestos en el archivo. Verifica que la columna PUESTO exista.');
+    }
+
+    await this.ubicacionService.desactivarTodos(empresaCodigo);
+    await this.ubicacionService.upsertLote(empresaCodigo, ubicaciones);
+
+    return {
+      empresa: empresaCodigo,
+      cargados: ubicaciones.length,
+      resumenCalidad: resumen,
+    };
   }
 }

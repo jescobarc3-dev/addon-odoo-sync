@@ -102,7 +102,7 @@ export interface EmpleadoComparacion {
 export const integracionSapApi = createApi({
   reducerPath: 'integracionSapApi',
   baseQuery: makeBaseQueryWithReauth('/api/integracion-sap'),
-  tagTypes: ['Registro', 'MapeoItem', 'MapeoBodega', 'Catalogo', 'Historial', 'Empleado'],
+  tagTypes: ['Registro', 'MapeoItem', 'MapeoBodega', 'Catalogo', 'Historial', 'Empleado', 'Ubicacion'],
   endpoints: (builder) => ({
     getRegistros: builder.query<
       { items: RegistroSincronizacion[]; total: number },
@@ -281,6 +281,36 @@ export const integracionSapApi = createApi({
       query: (params) => ({ url: '/catalogo/comparacion', params }),
       providesTags: ['Catalogo'],
     }),
+
+    // ── Catálogo de ubicaciones ────────────────────────────────────────────
+    getCatalogoUbicaciones: builder.query<
+      {
+        items: any[];
+        total: number;
+        filtros: { areas: string[]; industrias: string[]; departamentos: string[]; facturaciones: string[] };
+      },
+      {
+        empresa?: string;
+        q?: string;
+        area?: string;
+        industria?: string;
+        departamento?: string;
+        facturacion?: string;
+        soloConProblemas?: boolean;
+        page?: number;
+        limit?: number;
+      }
+    >({
+      query: (params) => ({ url: '/catalogo/ubicaciones', params }),
+      providesTags: ['Ubicacion'],
+    }),
+    getResumenUbicaciones: builder.query<
+      { total: number; conProblemas: number; scorePromedio: number },
+      { empresa?: string }
+    >({
+      query: (params) => ({ url: '/catalogo/ubicaciones/resumen', params }),
+      providesTags: ['Ubicacion'],
+    }),
   }),
 });
 
@@ -309,4 +339,6 @@ export const {
   useGetCatalogoQuery,
   useGetComparacionCatalogoQuery,
   useGetComparacionEmpleadosQuery,
+  useGetCatalogoUbicacionesQuery,
+  useGetResumenUbicacionesQuery,
 } = integracionSapApi;

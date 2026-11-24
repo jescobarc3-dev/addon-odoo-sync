@@ -25,6 +25,8 @@ import { CatalogoItemOrmEntity } from './documento-parser/catalogo-item.orm-enti
 import { CatalogoItemService } from './documento-parser/catalogo-item.service';
 import { CatalogoEmpleadoOrmEntity } from './documento-parser/catalogo-empleado.orm-entity';
 import { CatalogoEmpleadoService } from './documento-parser/catalogo-empleado.service';
+import { CatalogoUbicacionOrmEntity } from './documento-parser/catalogo-ubicacion.orm-entity';
+import { CatalogoUbicacionService } from './documento-parser/catalogo-ubicacion.service';
 import { REGISTRO_SINCRONIZACION_REPOSITORY } from './salida-bodega/domain/repositories/registro-sincronizacion.repository';
 import { MAPEO_ITEM_REPOSITORY } from './salida-bodega/domain/repositories/mapeo-item.repository';
 import { SAP_LECTOR_PORT } from './salida-bodega/application/ports/sap-lector.port';
@@ -44,6 +46,7 @@ import { ODOO_RRHH_PORT } from './salida-bodega/application/ports/odoo-rrhh.port
       HistorialCargaOrmEntity,
       CatalogoItemOrmEntity,
       CatalogoEmpleadoOrmEntity,
+      CatalogoUbicacionOrmEntity,
     ]),
   ],
   exports: [OdooCredencialesService],
@@ -64,6 +67,7 @@ import { ODOO_RRHH_PORT } from './salida-bodega/application/ports/odoo-rrhh.port
     ArchivoParserService,
     CatalogoItemService,
     CatalogoEmpleadoService,
+    CatalogoUbicacionService,
     DocumentoUploadService,
   ],
 })

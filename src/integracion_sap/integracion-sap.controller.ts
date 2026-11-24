@@ -17,6 +17,7 @@ import { ODOO_CATALOGO_PORT, IOdooCatalogoPort } from './salida-bodega/applicati
 import { ODOO_RRHH_PORT, IOdooRRHHPort } from './salida-bodega/application/ports/odoo-rrhh.port';
 import { CatalogoItemService } from './documento-parser/catalogo-item.service';
 import { CatalogoEmpleadoService } from './documento-parser/catalogo-empleado.service';
+import { CatalogoUbicacionService } from './documento-parser/catalogo-ubicacion.service';
 import { DocumentoUploadService } from './documento-parser/documento-upload.service';
 import { JwtPortalGuard } from '../portal/auth/guards/jwt-portal.guard';
 import { PortalPermisosGuard, RequirePermiso } from '../portal/auth/guards/portal-permisos.guard';
@@ -40,6 +41,7 @@ export class IntegracionSapController {
     private readonly procesarEntradaUseCase: ProcesarEntradaMercanciaUseCase,
     private readonly catalogoService: CatalogoItemService,
     private readonly catalogoEmpleadoService: CatalogoEmpleadoService,
+    private readonly catalogoUbicacionService: CatalogoUbicacionService,
     private readonly uploadService: DocumentoUploadService,
   ) {}
 
@@ -364,5 +366,40 @@ export class IntegracionSapController {
     const pageItems = filtered.slice(offset, offset + limitNum);
 
     return { total, page: pageNum, limit: limitNum, items: pageItems };
+  }
+
+  // ── CATÁLOGO DE UBICACIONES (gobierno de datos) ──────────────────────────
+
+  @Get('catalogo/ubicaciones')
+  @RequirePermiso('integracion-sap:read')
+  @ApiOperation({ summary: 'Catálogo de puestos/ubicaciones con score de calidad de datos' })
+  async catalogoUbicaciones(
+    @Query('empresa') empresa = 'DEFAULT',
+    @Query('q') q?: string,
+    @Query('area') area?: string,
+    @Query('industria') industria?: string,
+    @Query('departamento') departamento?: string,
+    @Query('facturacion') facturacion?: string,
+    @Query('soloConProblemas') soloConProblemas?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page?: number,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit?: number,
+  ) {
+    return this.catalogoUbicacionService.buscarPaginado(empresa, {
+      q,
+      area,
+      industria,
+      departamento,
+      facturacion,
+      soloConProblemas: soloConProblemas === 'true',
+      page,
+      limit,
+    });
+  }
+
+  @Get('catalogo/ubicaciones/resumen')
+  @RequirePermiso('integracion-sap:read')
+  @ApiOperation({ summary: 'Resumen de calidad del catálogo de ubicaciones' })
+  async resumenUbicaciones(@Query('empresa') empresa = 'DEFAULT') {
+    return this.catalogoUbicacionService.contarActivos(empresa);
   }
 }
