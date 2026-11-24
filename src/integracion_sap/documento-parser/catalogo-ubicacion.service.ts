@@ -149,16 +149,70 @@ function calcularCalidad(u: Omit<UbicacionNormalizada, 'calidadScore' | 'issues'
   };
 }
 
+// ── Correcciones en lote aplicables en el wizard ─────────────────────────────
+
+export interface CorreccionesLote {
+  zona?: number;       // valor por defecto para registros con zona null/0
+}
+
 // ── Servicio ──────────────────────────────────────────────────────────────────
+
+interface SesionParseo {
+  ubicaciones: UbicacionNormalizada[];
+  resumen: ResumenCalidadUbicaciones;
+  empresa: string;
+  ts: number;
+}
 
 @Injectable()
 export class CatalogoUbicacionService {
   private readonly logger = new Logger(CatalogoUbicacionService.name);
+  private readonly sesiones = new Map<string, SesionParseo>();
+  private static readonly SESSION_TTL_MS = 30 * 60 * 1000; // 30 min
 
   constructor(
     @InjectRepository(CatalogoUbicacionOrmEntity)
     private readonly repo: Repository<CatalogoUbicacionOrmEntity>,
   ) {}
+
+  // ── Sesión de parseo (wizard dos pasos) ──────────────────────────────────
+
+  guardarSesion(empresa: string, ubicaciones: UbicacionNormalizada[], resumen: ResumenCalidadUbicaciones): string {
+    this._limpiarSesionesViejas();
+    const id = `ub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    this.sesiones.set(id, { ubicaciones, resumen, empresa, ts: Date.now() });
+    return id;
+  }
+
+  obtenerSesion(sesionId: string): SesionParseo {
+    const s = this.sesiones.get(sesionId);
+    if (!s) throw new Error('Sesión expirada o no existe. Vuelve a subir el archivo.');
+    return s;
+  }
+
+  eliminarSesion(sesionId: string): void {
+    this.sesiones.delete(sesionId);
+  }
+
+  aplicarCorrecciones(ubicaciones: UbicacionNormalizada[], correcciones: CorreccionesLote): UbicacionNormalizada[] {
+    return ubicaciones.map(u => {
+      const patch: Partial<UbicacionNormalizada> = {};
+      if (correcciones.zona !== undefined && (!u.zona || u.zona === 0)) {
+        patch.zona = correcciones.zona;
+      }
+      if (Object.keys(patch).length === 0) return u;
+      const draft = { ...u, ...patch };
+      const { score, issues } = calcularCalidad(draft);
+      return { ...draft, calidadScore: score, issues };
+    });
+  }
+
+  private _limpiarSesionesViejas(): void {
+    const ahora = Date.now();
+    for (const [k, v] of this.sesiones) {
+      if (ahora - v.ts > CatalogoUbicacionService.SESSION_TTL_MS) this.sesiones.delete(k);
+    }
+  }
 
   /**
    * Parsea un Excel con el formato estándar de listado de puestos.

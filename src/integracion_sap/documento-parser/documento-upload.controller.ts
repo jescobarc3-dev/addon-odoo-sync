@@ -28,7 +28,7 @@ export class DocumentoUploadController {
   @Post('ubicaciones/upload')
   @RequirePermiso('integracion-sap:cargar')
   @ApiOperation({
-    summary: 'Cargar Excel de puestos/ubicaciones. Aplica normalización y calcula score de calidad de datos.',
+    summary: 'Paso 1: Parsear Excel de ubicaciones. Devuelve sesionId + resumen de calidad SIN guardar en DB.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -36,7 +36,7 @@ export class DocumentoUploadController {
       type: 'object',
       properties: {
         file: { type: 'string', format: 'binary' },
-        empresa: { type: 'string', description: 'Código de empresa (default: DEFAULT)' },
+        empresa: { type: 'string' },
       },
     },
   })
@@ -55,14 +55,34 @@ export class DocumentoUploadController {
       throw new BadRequestException('No se encontraron puestos en el archivo. Verifica que la columna PUESTO exista.');
     }
 
-    await this.ubicacionService.desactivarTodos(empresaCodigo);
-    await this.ubicacionService.upsertLote(empresaCodigo, ubicaciones);
+    const sesionId = this.ubicacionService.guardarSesion(empresaCodigo, ubicaciones, resumen);
+    return { sesionId, resumenCalidad: resumen };
+  }
 
-    return {
-      empresa: empresaCodigo,
-      cargados: ubicaciones.length,
-      resumenCalidad: resumen,
-    };
+  @Post('ubicaciones/confirmar/:sesionId')
+  @RequirePermiso('integracion-sap:cargar')
+  @ApiOperation({
+    summary: 'Paso 2: Aplicar correcciones en lote y guardar en DB. Consume la sesión de parseo.',
+  })
+  async confirmarUbicaciones(
+    @Param('sesionId') sesionId: string,
+    @Body() body: { correcciones?: { zona?: number } },
+  ) {
+    let { ubicaciones, resumen, empresa } = this.ubicacionService.obtenerSesion(sesionId);
+
+    if (body.correcciones && Object.keys(body.correcciones).length > 0) {
+      ubicaciones = this.ubicacionService.aplicarCorrecciones(ubicaciones, body.correcciones);
+      // Recalcular resumen tras correcciones
+      const conProblemas = ubicaciones.filter(u => u.issues.length > 0).length;
+      const scorePromedio = Math.round(ubicaciones.reduce((s, u) => s + u.calidadScore, 0) / ubicaciones.length);
+      resumen = { ...resumen, conProblemas, sinProblemas: ubicaciones.length - conProblemas, scorePromedio };
+    }
+
+    await this.ubicacionService.desactivarTodos(empresa);
+    await this.ubicacionService.upsertLote(empresa, ubicaciones);
+    this.ubicacionService.eliminarSesion(sesionId);
+
+    return { empresa, cargados: ubicaciones.length, resumenCalidad: resumen };
   }
 
   @Post(':tipo/upload')
