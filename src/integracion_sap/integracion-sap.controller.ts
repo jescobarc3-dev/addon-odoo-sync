@@ -284,7 +284,7 @@ export class IntegracionSapController {
 
   @Get('catalogo/comparacion')
   @RequirePermiso('integracion-sap:read')
-  @ApiOperation({ summary: 'Catálogo local vs Odoo: precio y stock lado a lado' })
+  @ApiOperation({ summary: 'Catálogo completo vs Odoo: items con inventario SAP + items Odoo sin inventario SAP (gris)' })
   async comparacionCatalogo(
     @Query('q') q?: string,
     @Query('empresa') empresa = 'DEFAULT',
@@ -293,30 +293,76 @@ export class IntegracionSapController {
   ) {
     const pageNum = page ?? 1;
     const limitNum = limit ?? 50;
-    const offset = (pageNum - 1) * limitNum;
+    const qTrim = (q ?? '').trim().toLowerCase();
 
-    const { items, total } = await this.catalogoService.buscarPaginado(empresa, q ?? '', limitNum, offset);
+    // 1. Catálogo local: items que aparecieron en el último Excel SAP (tienen inventario)
+    const localItems = await this.catalogoService.buscarTodos(empresa);
+    const localMap = new Map(localItems.map(i => [i.itemCode, i]));
 
+    // 2. Todos los productos de Odoo
     let odooItems: Array<{ defaultCode: string; nombre: string; standardPrice: number; qtyAvailable: number }> = [];
     try {
-      odooItems = await this.odooCatalogo.consultarProductosPorCodigos(items.map(i => i.itemCode));
+      odooItems = await this.odooCatalogo.listarTodosProductos();
     } catch {
-      // Si Odoo falla, devolvemos los datos locales con odoo=null — sin bloquear la vista
+      // Si Odoo falla, mostramos solo los locales
     }
-
     const odooMap = new Map(odooItems.map(o => [o.defaultCode, o]));
 
-    return {
-      total,
-      page: pageNum,
-      limit: limitNum,
-      items: items.map(local => ({
-        itemCode: local.itemCode,
-        itemName: local.itemName,
-        uomCode: local.uomCode,
-        local: { precio: local.precioUnitario, cantidad: local.cantidadSap },
-        odoo: odooMap.get(local.itemCode) ?? null,
-      })),
+    // 3. Merge: Odoo como base + items locales que no están en Odoo
+    type MergedItem = {
+      itemCode: string; itemName: string; uomCode?: string | null;
+      local: { precio: number | null; cantidad: number | null } | null;
+      odoo: { defaultCode: string; nombre: string; standardPrice: number; qtyAvailable: number } | null;
+      sinInventarioSap: boolean;
     };
+
+    const merged: MergedItem[] = [];
+
+    for (const odoo of odooItems) {
+      const local = localMap.get(odoo.defaultCode) ?? null;
+      merged.push({
+        itemCode: odoo.defaultCode,
+        itemName: local?.itemName ?? odoo.nombre,
+        uomCode: local?.uomCode ?? null,
+        local: local ? { precio: local.precioUnitario ?? null, cantidad: local.cantidadSap ?? null } : null,
+        odoo,
+        sinInventarioSap: local === null,
+      });
+    }
+
+    // Items locales que no existen en Odoo (aún no sincronizados)
+    for (const local of localItems) {
+      if (!odooMap.has(local.itemCode)) {
+        merged.push({
+          itemCode: local.itemCode,
+          itemName: local.itemName,
+          uomCode: local.uomCode ?? null,
+          local: { precio: local.precioUnitario ?? null, cantidad: local.cantidadSap ?? null },
+          odoo: null,
+          sinInventarioSap: false,
+        });
+      }
+    }
+
+    // 4. Filtro de búsqueda en memoria
+    const filtered = qTrim.length >= 2
+      ? merged.filter(i =>
+          i.itemCode.toLowerCase().includes(qTrim) ||
+          i.itemName.toLowerCase().includes(qTrim),
+        )
+      : merged;
+
+    // 5. Orden: items con inventario SAP primero, luego grisitos; dentro de cada grupo por código
+    filtered.sort((a, b) => {
+      if (a.sinInventarioSap !== b.sinInventarioSap) return a.sinInventarioSap ? 1 : -1;
+      return a.itemCode.localeCompare(b.itemCode);
+    });
+
+    // 6. Paginación en memoria
+    const total = filtered.length;
+    const offset = (pageNum - 1) * limitNum;
+    const pageItems = filtered.slice(offset, offset + limitNum);
+
+    return { total, page: pageNum, limit: limitNum, items: pageItems };
   }
 }

@@ -460,6 +460,23 @@ export class OdooCatalogoRpcAdapter implements IOdooCatalogoPort {
     }));
   }
 
+  async listarTodosProductos(): Promise<ProductoOdooResumen[]> {
+    const result = await this.execute(
+      'product.template',
+      'search_read',
+      [[['active', '=', true]]],
+      { fields: ['default_code', 'name', 'standard_price', 'qty_available'], limit: 0 },
+    );
+    return (result ?? [])
+      .filter((r: any) => !!r.default_code)
+      .map((r: any) => ({
+        defaultCode: r.default_code,
+        nombre: r.name,
+        standardPrice: r.standard_price ?? 0,
+        qtyAvailable: r.qty_available ?? 0,
+      }));
+  }
+
   async listarPickingTypes(): Promise<PickingTypeOdoo[]> {
     const result = await this.execute(
       'stock.picking.type',

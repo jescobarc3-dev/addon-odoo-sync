@@ -260,6 +260,7 @@ export function CatalogoPage() {
           <Group gap={4}><Badge size="xs" color="red" variant="light">X%</Badge><Text size="xs" c="#71717A">Dif significativa</Text></Group>
           <Group gap={4}><Badge size="xs" color="orange" variant="light">Addon Q0</Badge><Text size="xs" c="#71717A">El addon tiene Q0 (sin costo cargado)</Text></Group>
           <Group gap={4}><IconX size={13} color="#A32D2D" /><Text size="xs" c="#71717A">No existe en Odoo</Text></Group>
+          <Group gap={4}><Box style={{ width: 13, height: 13, background: '#E0E0E0', borderRadius: 2 }} /><Text size="xs" c="#71717A">Sin inventario SAP (stock 0)</Text></Group>
         </Group>
       </Card>
 
@@ -330,28 +331,36 @@ export function CatalogoPage() {
                         ))}
                       </Table.Tr>
                     ))
-                  : items.map((item) => (
-                      <Table.Tr key={item.itemCode}>
+                  : items.map((item) => {
+                      const sinSap = (item as any).sinInventarioSap === true;
+                      const rowBg = sinSap ? '#FAFAFA' : undefined;
+                      const textC = sinSap ? '#C4C4C4' : '#18181B';
+                      return (
+                      <Table.Tr key={item.itemCode} style={{ background: rowBg, opacity: sinSap ? 0.72 : 1 }}>
                         <Table.Td>
-                          <Text size="xs" fw={600} style={{ fontFamily: 'monospace', color: '#1A365D' }}>
+                          <Text size="xs" fw={600} style={{ fontFamily: 'monospace', color: sinSap ? '#BDBDBD' : '#1A365D' }}>
                             {item.itemCode}
                           </Text>
                         </Table.Td>
                         <Table.Td>
-                          <Text size="xs" c="#18181B">{item.itemName}</Text>
+                          <Text size="xs" c={textC}>{item.itemName}</Text>
                         </Table.Td>
                         <Table.Td>
-                          <Text size="xs" c="#71717A">{item.uomCode ?? '—'}</Text>
+                          <Text size="xs" c={sinSap ? '#D4D4D4' : '#71717A'}>{item.uomCode ?? '—'}</Text>
                         </Table.Td>
-                        <Table.Td style={{ textAlign: 'right', background: '#F0FDF420' }}>
-                          <PrecioCell valor={item.local.precio} label="addon" />
+                        <Table.Td style={{ textAlign: 'right', background: sinSap ? '#FFF5F520' : '#F0FDF420' }}>
+                          {sinSap
+                            ? <Text size="xs" fw={500} c="#E53E3E">Q 0.00</Text>
+                            : <PrecioCell valor={item.local?.precio} label="addon" />}
                         </Table.Td>
-                        <Table.Td style={{ textAlign: 'right', background: '#F0FDF420' }}>
-                          {item.local.cantidad != null
-                            ? <Text size="xs" fw={500} c={toNum(item.local.cantidad) > 0 ? '#166534' : '#A1A1AA'}>
-                                <NumberFormatter value={toNum(item.local.cantidad)} decimalScale={2} fixedDecimalScale />
-                              </Text>
-                            : <Text size="xs" c="#A1A1AA">—</Text>}
+                        <Table.Td style={{ textAlign: 'right', background: sinSap ? '#FFF5F520' : '#F0FDF420' }}>
+                          {sinSap
+                            ? <Text size="xs" fw={500} c="#E53E3E">0.00</Text>
+                            : item.local?.cantidad != null
+                              ? <Text size="xs" fw={500} c={toNum(item.local.cantidad) > 0 ? '#166534' : '#A1A1AA'}>
+                                  <NumberFormatter value={toNum(item.local.cantidad)} decimalScale={2} fixedDecimalScale />
+                                </Text>
+                              : <Text size="xs" c="#A1A1AA">—</Text>}
                         </Table.Td>
                         <Table.Td style={{ textAlign: 'right', background: '#EFF6FF50' }}>
                           {item.odoo
@@ -366,7 +375,9 @@ export function CatalogoPage() {
                             : <Text size="xs" c="#A1A1AA">—</Text>}
                         </Table.Td>
                         <Table.Td style={{ textAlign: 'center' }}>
-                          <DifBadge localPrecio={item.local.precio} odooPrecio={item.odoo?.standardPrice ?? null} />
+                          {sinSap
+                            ? <Text size="xs" c="#C4C4C4">—</Text>
+                            : <DifBadge localPrecio={item.local?.precio} odooPrecio={item.odoo?.standardPrice ?? null} />}
                         </Table.Td>
                         <Table.Td style={{ textAlign: 'center' }}>
                           {item.odoo
@@ -380,7 +391,8 @@ export function CatalogoPage() {
                               </Tooltip>}
                         </Table.Td>
                       </Table.Tr>
-                    ))}
+                      );
+                    })}
               </Table.Tbody>
             </Table>
           </Table.ScrollContainer>

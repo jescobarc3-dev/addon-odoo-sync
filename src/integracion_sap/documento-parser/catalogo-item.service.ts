@@ -179,6 +179,21 @@ export class CatalogoItemService {
     return this.repo.count({ where: { empresaCodigo: empresa, activo: true } });
   }
 
+  /** Devuelve todos los items activos del catálogo — para la comparación completa vs Odoo. */
+  async buscarTodos(empresa: string): Promise<ItemCatalogo[]> {
+    const rows = await this.repo.find({
+      where: { empresaCodigo: empresa, activo: true },
+      order: { itemCode: 'ASC' },
+    });
+    return rows.map(r => ({
+      itemCode: r.itemCode,
+      itemName: r.itemName,
+      uomCode: r.uomCode ?? undefined,
+      precioUnitario: r.precioUnitario,
+      cantidadSap: r.cantidadSap,
+    }));
+  }
+
   /** Marca todos los items de la empresa como inactivos. Llamar antes de upsertLote para que el catálogo refleje solo la carga más reciente. */
   async desactivarTodos(empresa: string): Promise<void> {
     await this.repo.update({ empresaCodigo: empresa, activo: true }, { activo: false });

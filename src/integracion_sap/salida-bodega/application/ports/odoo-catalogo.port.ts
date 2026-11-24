@@ -63,4 +63,5 @@ export interface IOdooCatalogoPort {
   listarUbicacionesInternas(): Promise<UbicacionOdoo[]>;
   listarPickingTypes(): Promise<PickingTypeOdoo[]>;
   consultarProductosPorCodigos(itemCodes: string[]): Promise<ProductoOdooResumen[]>;
+  listarTodosProductos(): Promise<ProductoOdooResumen[]>;
 }
