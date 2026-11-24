@@ -58,7 +58,7 @@ export interface IOdooCatalogoPort {
   upsertProducto(dto: UpsertProductoDto): Promise<ResultadoUpsert>;
   resolverCategoria(nombreCategoria: string): Promise<number>;
   ajustarInventario(dto: AjusteInventarioDto): Promise<'ajustado' | 'sin_cambio'>;
-  procesarLoteInventario(items: ItemLote[], onProgreso?: (n: number) => void): Promise<ResultadoLote>;
+  procesarLoteInventario(items: ItemLote[], onProgreso?: (n: number) => void, odooUid?: number): Promise<ResultadoLote>;
   buscarUbicacion(whsCode: string): Promise<number | null>;
   listarUbicacionesInternas(): Promise<UbicacionOdoo[]>;
   listarPickingTypes(): Promise<PickingTypeOdoo[]>;

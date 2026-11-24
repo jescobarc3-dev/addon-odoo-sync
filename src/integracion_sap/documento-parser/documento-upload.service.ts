@@ -134,6 +134,7 @@ export class DocumentoUploadService {
     uploadId: string,
     mapeoColumnas?: Record<string, string>,
     ubicacionOverrideId?: number,
+    odooUid?: number,
   ): { jobId: string; total: number } {
     const sesion = this.obtenerSesion(uploadId);
     let filas = sesion.resultado.filas;
@@ -147,7 +148,7 @@ export class DocumentoUploadService {
 
     const sesionTipo = sesion.tipo;
     const sesionArchivo = sesion._originalname ?? null;
-    this._procesarInventarioAsync(jobId, uploadId, mapeoColumnas, ubicacionOverrideId).catch(async err => {
+    this._procesarInventarioAsync(jobId, uploadId, mapeoColumnas, ubicacionOverrideId, odooUid).catch(async err => {
       const msg: string = err?.message ?? 'Error inesperado';
       this.jobs.set(jobId, { estado: 'error', progreso: 0, total, errorMsg: msg, creadoEn: new Date() });
       this.logger.error(`Job ${jobId} falló: ${msg}`);
@@ -164,6 +165,7 @@ export class DocumentoUploadService {
     uploadId: string,
     mapeoColumnas?: Record<string, string>,
     ubicacionOverrideId?: number,
+    odooUid?: number,
   ): Promise<void> {
     const sesion = this.obtenerSesion(uploadId);
     const { empresa, resultado } = sesion;
@@ -224,6 +226,7 @@ export class DocumentoUploadService {
       loteResult = await this.odooCatalogo.procesarLoteInventario(
         itemsLote,
         (n: number) => { job.progreso = n; this.jobs.set(jobId, job); },
+        odooUid,
       );
     } catch (err: any) {
       this.logger.error(`Job ${jobId} error en lote: ${err.message}`);

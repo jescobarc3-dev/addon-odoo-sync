@@ -234,7 +234,7 @@ export class OdooCatalogoRpcAdapter implements IOdooCatalogoPort {
     return 'ajustado';
   }
 
-  async procesarLoteInventario(items: ItemLote[], onProgreso?: (n: number) => void): Promise<ResultadoLote> {
+  async procesarLoteInventario(items: ItemLote[], onProgreso?: (n: number) => void, odooUid?: number): Promise<ResultadoLote> {
     const total = items.length;
     const report = (n: number) => onProgreso?.(Math.min(Math.floor(n), total));
     if (total === 0) return { ajustados: 0, sinCambio: 0, errores: [] };
@@ -388,11 +388,17 @@ export class OdooCatalogoRpcAdapter implements IOdooCatalogoPort {
       ...quantsToUpdate.map(q => ({ id: q.id, qty: q.qty })),
       ...staleQuants.map(id => ({ id, qty: 0 })),
     ];
+    const quantWriteVals = (qty: number) => {
+      const vals: Record<string, any> = { inventory_quantity: qty, inventory_quantity_set: true };
+      if (odooUid) vals.user_id = odooUid;
+      return vals;
+    };
+
     const WRITE_CHUNK = 10;
     for (let i = 0; i < allToWrite.length; i += WRITE_CHUNK) {
       const chunk = allToWrite.slice(i, i + WRITE_CHUNK);
       await Promise.all(chunk.map(q =>
-        this.execute('stock.quant', 'write', [[q.id], { inventory_quantity: q.qty, inventory_quantity_set: true }]),
+        this.execute('stock.quant', 'write', [[q.id], quantWriteVals(q.qty)]),
       ));
       allQuantIdsToApply.push(...chunk.map(q => q.id));
       report(total * 0.65 + (i / Math.max(allToWrite.length, 1)) * total * 0.2);
@@ -400,7 +406,10 @@ export class OdooCatalogoRpcAdapter implements IOdooCatalogoPort {
 
     // ── 8. Batch create new quants (only non-zero quantities reach here) ───
     if (quantsToCreate.length > 0) {
-      const newIds: number | number[] = await this.execute('stock.quant', 'create', [quantsToCreate]);
+      const toCreate = odooUid
+        ? quantsToCreate.map(q => ({ ...q, user_id: odooUid }))
+        : quantsToCreate;
+      const newIds: number | number[] = await this.execute('stock.quant', 'create', [toCreate]);
       allQuantIdsToApply.push(...(Array.isArray(newIds) ? newIds : [newIds]));
     }
     report(total * 0.9);

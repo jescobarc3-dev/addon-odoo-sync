@@ -1,8 +1,8 @@
 import {
   Controller, Post, Get, Param, Body, UploadedFile,
-  UseInterceptors, BadRequestException, UseGuards, Res,
+  UseInterceptors, BadRequestException, UseGuards, Res, Req,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { DocumentoUploadService } from './documento-upload.service';
@@ -66,12 +66,14 @@ export class DocumentoUploadController {
   @RequirePermiso('integracion-sap:cargar')
   @ApiOperation({ summary: 'Iniciar procesamiento async — retorna jobId inmediatamente' })
   async procesar(
+    @Req() req: Request,
     @Param('tipo') tipo: string,
     @Param('uploadId') uploadId: string,
     @Body() body: { mapeoColumnas?: Record<string, string>; ubicacionOverrideId?: number; empresa?: string; referenciaSap?: string; whsCodeOverride?: string },
   ) {
+    const odooUid: number | undefined = (req as any).user?.odooUid;
     if (tipo === 'INVENTARIO_INICIAL' || tipo === 'ACTUALIZACION_INVENTARIO') {
-      return this.uploadService.iniciarJob(uploadId, body.mapeoColumnas, body.ubicacionOverrideId);
+      return this.uploadService.iniciarJob(uploadId, body.mapeoColumnas, body.ubicacionOverrideId, odooUid);
     }
     if (tipo === 'SALIDA_BODEGA' || tipo === 'ENTRADA_MERCANCIA') {
       return this.uploadService.iniciarJobPicking(
