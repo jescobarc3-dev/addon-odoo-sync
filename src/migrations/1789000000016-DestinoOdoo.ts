@@ -5,7 +5,7 @@ export class DestinoOdoo1789000000016 implements MigrationInterface {
 
   async up(qr: QueryRunner): Promise<void> {
     await qr.query(`
-      CREATE TABLE integracion_sap.destino_odoo (
+      CREATE TABLE IF NOT EXISTS integracion_sap.destino_odoo (
         id SERIAL PRIMARY KEY,
         empresa_codigo VARCHAR(20) NOT NULL DEFAULT 'DEFAULT',
         nombre VARCHAR(100) NOT NULL,
@@ -21,7 +21,7 @@ export class DestinoOdoo1789000000016 implements MigrationInterface {
       )
     `);
     await qr.query(`
-      CREATE TABLE integracion_sap.destino_odoo_campo (
+      CREATE TABLE IF NOT EXISTS integracion_sap.destino_odoo_campo (
         id SERIAL PRIMARY KEY,
         destino_id INTEGER NOT NULL REFERENCES integracion_sap.destino_odoo(id) ON DELETE CASCADE,
         campo_local VARCHAR(100) NOT NULL,
