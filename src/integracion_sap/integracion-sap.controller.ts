@@ -19,6 +19,7 @@ import { CatalogoItemService } from './documento-parser/catalogo-item.service';
 import { CatalogoEmpleadoService } from './documento-parser/catalogo-empleado.service';
 import { CatalogoUbicacionService } from './documento-parser/catalogo-ubicacion.service';
 import { DocumentoUploadService } from './documento-parser/documento-upload.service';
+import { DestinoOdooService, DestinoDto } from './destino-odoo/destino-odoo.service';
 import { JwtPortalGuard } from '../portal/auth/guards/jwt-portal.guard';
 import { PortalPermisosGuard, RequirePermiso } from '../portal/auth/guards/portal-permisos.guard';
 
@@ -43,6 +44,7 @@ export class IntegracionSapController {
     private readonly catalogoEmpleadoService: CatalogoEmpleadoService,
     private readonly catalogoUbicacionService: CatalogoUbicacionService,
     private readonly uploadService: DocumentoUploadService,
+    private readonly destinoOdooService: DestinoOdooService,
   ) {}
 
   @Get('registros')
@@ -403,5 +405,52 @@ export class IntegracionSapController {
   @ApiOperation({ summary: 'Resumen de calidad del catálogo de ubicaciones' })
   async resumenUbicaciones(@Query('empresa') empresa = 'DEFAULT') {
     return this.catalogoUbicacionService.contarActivos(empresa);
+  }
+
+  // ── DESTINOS ODOO ────────────────────────────────────────────────────────
+
+  @Get('destinos-odoo')
+  @RequirePermiso('integracion-sap:mapear')
+  @ApiOperation({ summary: 'Listar destinos Odoo configurados' })
+  listarDestinos(@Query('empresa') empresa = 'DEFAULT') {
+    return this.destinoOdooService.listar(empresa);
+  }
+
+  @Get('destinos-odoo/campos-odoo')
+  @RequirePermiso('integracion-sap:mapear')
+  @ApiOperation({ summary: 'Obtener campos escribibles de un modelo Odoo' })
+  async camposOdoo(@Query('modelo') modelo: string) {
+    return this.destinoOdooService.obtenerCamposOdoo(modelo);
+  }
+
+  @Post('destinos-odoo')
+  @RequirePermiso('integracion-sap:mapear')
+  @ApiOperation({ summary: 'Crear destino Odoo' })
+  crearDestino(@Body() dto: DestinoDto) {
+    return this.destinoOdooService.crear(dto);
+  }
+
+  @Put('destinos-odoo/:id')
+  @RequirePermiso('integracion-sap:mapear')
+  @ApiOperation({ summary: 'Actualizar destino Odoo' })
+  actualizarDestino(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: DestinoDto,
+  ) {
+    return this.destinoOdooService.actualizar(id, dto);
+  }
+
+  @Delete('destinos-odoo/:id')
+  @RequirePermiso('integracion-sap:mapear')
+  @ApiOperation({ summary: 'Eliminar destino Odoo' })
+  eliminarDestino(@Param('id', ParseIntPipe) id: number) {
+    return this.destinoOdooService.eliminar(id);
+  }
+
+  @Post('destinos-odoo/:id/sincronizar')
+  @RequirePermiso('integracion-sap:mapear')
+  @ApiOperation({ summary: 'Ejecutar sincronización de un destino hacia Odoo' })
+  sincronizarDestino(@Param('id', ParseIntPipe) id: number) {
+    return this.destinoOdooService.sincronizar(id);
   }
 }

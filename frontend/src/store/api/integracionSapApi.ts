@@ -99,10 +99,39 @@ export interface EmpleadoComparacion {
   } | null;
 }
 
+export interface DestinoCampo {
+  id?: number;
+  campoLocal: string;
+  campoOdoo: string;
+  tipo: string;
+}
+
+export interface DestinoOdoo {
+  id: number;
+  empresaCodigo: string;
+  nombre: string;
+  catalogo: string;
+  odooModelo: string;
+  campoClaveLocal: string;
+  campoClaveOdoo: string;
+  autoSync: boolean;
+  activo: boolean;
+  ultimaSync: string | null;
+  ultimoError: string | null;
+  creadoEn: string;
+  campos: DestinoCampo[];
+}
+
+export interface CampoOdooInfo {
+  nombre: string;
+  tipo: string;
+  etiqueta: string;
+}
+
 export const integracionSapApi = createApi({
   reducerPath: 'integracionSapApi',
   baseQuery: makeBaseQueryWithReauth('/api/integracion-sap'),
-  tagTypes: ['Registro', 'MapeoItem', 'MapeoBodega', 'Catalogo', 'Historial', 'Empleado', 'Ubicacion'],
+  tagTypes: ['Registro', 'MapeoItem', 'MapeoBodega', 'Catalogo', 'Historial', 'Empleado', 'Ubicacion', 'DestinoOdoo'],
   endpoints: (builder) => ({
     getRegistros: builder.query<
       { items: RegistroSincronizacion[]; total: number },
@@ -282,6 +311,31 @@ export const integracionSapApi = createApi({
       providesTags: ['Catalogo'],
     }),
 
+    // ── Destinos Odoo ──────────────────────────────────────────────────────
+    getDestinosOdoo: builder.query<DestinoOdoo[], { empresa?: string }>({
+      query: (params) => ({ url: '/destinos-odoo', params }),
+      providesTags: ['DestinoOdoo'],
+    }),
+    getCamposOdooModelo: builder.query<CampoOdooInfo[], { modelo: string }>({
+      query: ({ modelo }) => ({ url: '/destinos-odoo/campos-odoo', params: { modelo } }),
+    }),
+    crearDestinoOdoo: builder.mutation<DestinoOdoo, Partial<DestinoOdoo>>({
+      query: (body) => ({ url: '/destinos-odoo', method: 'POST', body }),
+      invalidatesTags: ['DestinoOdoo'],
+    }),
+    actualizarDestinoOdoo: builder.mutation<DestinoOdoo, { id: number; data: Partial<DestinoOdoo> }>({
+      query: ({ id, data }) => ({ url: `/destinos-odoo/${id}`, method: 'PUT', body: data }),
+      invalidatesTags: ['DestinoOdoo'],
+    }),
+    eliminarDestinoOdoo: builder.mutation<{ ok: boolean }, number>({
+      query: (id) => ({ url: `/destinos-odoo/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['DestinoOdoo'],
+    }),
+    sincronizarDestino: builder.mutation<{ ok: boolean; creados: number; actualizados: number; error?: string }, number>({
+      query: (id) => ({ url: `/destinos-odoo/${id}/sincronizar`, method: 'POST' }),
+      invalidatesTags: ['DestinoOdoo'],
+    }),
+
     // ── Catálogo de ubicaciones ────────────────────────────────────────────
     getCatalogoUbicaciones: builder.query<
       {
@@ -342,4 +396,11 @@ export const {
   useGetComparacionEmpleadosQuery,
   useGetCatalogoUbicacionesQuery,
   useGetResumenUbicacionesQuery,
+  useGetDestinosOdooQuery,
+  useGetCamposOdooModeloQuery,
+  useLazyGetCamposOdooModeloQuery,
+  useCrearDestinoOdooMutation,
+  useActualizarDestinoOdooMutation,
+  useEliminarDestinoOdooMutation,
+  useSincronizarDestinoMutation,
 } = integracionSapApi;

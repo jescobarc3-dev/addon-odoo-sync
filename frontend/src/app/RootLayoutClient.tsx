@@ -26,6 +26,7 @@ import {
   IconUsers,
   IconUserPlus,
   IconMapPin,
+  IconPlugConnected,
   IconLogout,
   IconExternalLink,
   IconLink,
@@ -40,6 +41,7 @@ const NAV_SECTIONS = [
       { href: '/integracion-sap/dashboard', label: 'Dashboard', icon: IconLayoutDashboard },
       { href: '/integracion-sap/cola', label: 'Cola de revisión', icon: IconClipboardList },
       { href: '/integracion-sap/mapeos', label: 'Mapeos', icon: IconTag },
+      { href: '/integracion-sap/destinos-odoo', label: 'Destinos Odoo', icon: IconPlugConnected },
     ],
   },
   {
@@ -78,6 +80,7 @@ const PAGE_LABELS: Record<string, string> = {
   '/integracion-sap/documentos/actualizacion': 'Inventario de artículos',
   '/integracion-sap/documentos/entradas': 'Entradas de mercancía',
   '/integracion-sap/documentos/salidas': 'Salidas de mercancía',
+  '/integracion-sap/destinos-odoo': 'Destinos Odoo',
   '/integracion-sap/ubicaciones': 'Ubicaciones',
   '/integracion-sap/ubicaciones/carga': 'Carga de ubicaciones',
   '/admin/configuracion': 'Configuración',

@@ -517,6 +517,10 @@ export class CatalogoUbicacionService {
     return { clientes, areas, industrias, departamentos, facturaciones };
   }
 
+  async buscarTodos(empresa: string): Promise<CatalogoUbicacionOrmEntity[]> {
+    return this.repo.find({ where: { empresaCodigo: empresa, activo: true }, order: { puesto: 'ASC' } });
+  }
+
   async contarActivos(empresa: string): Promise<{ total: number; conProblemas: number; scorePromedio: number }> {
     const rows = await this.repo
       .createQueryBuilder('u')
