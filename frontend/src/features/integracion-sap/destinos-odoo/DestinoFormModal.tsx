@@ -214,7 +214,7 @@ export function DestinoFormModal({ opened, onClose, destino, empresa }: Props) {
             value={modelo}
             onChange={handleModeloSearch}
             onOptionSubmit={(val) => setModelo(val)}
-            data={modeloOpciones.map(m => ({ value: m.modelo, label: m.nombre }))}
+            data={modeloOpciones.map(m => m.modelo)}
             renderOption={({ option }) => (
               <Box py={2}>
                 <Text size="sm" fw={600} ff="monospace" c="dark">{option.value}</Text>
