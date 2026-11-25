@@ -83,6 +83,7 @@ export function DestinoFormModal({ opened, onClose, destino, empresa }: Props) {
 
   const [modeloOpciones, setModeloOpciones] = useState<{ modelo: string; nombre: string }[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const modeloNombresRef = useRef<Map<string, string>>(new Map());
 
   const [crear, { isLoading: creando }] = useCrearDestinoOdooMutation();
   const [actualizar, { isLoading: actualizando }] = useActualizarDestinoOdooMutation();
@@ -115,6 +116,7 @@ export function DestinoFormModal({ opened, onClose, destino, empresa }: Props) {
       try {
         const res = await fetchModelos({ q: q.trim() }).unwrap();
         setModeloOpciones(res);
+        res.forEach(m => modeloNombresRef.current.set(m.modelo, m.nombre));
       } catch { /* silencioso */ }
     }, 350);
   };
@@ -216,7 +218,7 @@ export function DestinoFormModal({ opened, onClose, destino, empresa }: Props) {
             renderOption={({ option }) => (
               <Box py={2}>
                 <Text size="sm" fw={600} ff="monospace" c="dark">{option.value}</Text>
-                <Text size="xs" c="dimmed">{option.label}</Text>
+                <Text size="xs" c="dimmed">{modeloNombresRef.current.get(option.value) ?? ''}</Text>
               </Box>
             )}
             style={{ flex: 1 }}
