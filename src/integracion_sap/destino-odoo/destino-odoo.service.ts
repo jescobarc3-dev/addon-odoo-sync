@@ -122,6 +122,20 @@ export class DestinoOdooService {
     await this.repo.delete(id);
   }
 
+  // ── Buscar modelos Odoo (ir.model) ─────────────────────────────────────────
+
+  async buscarModelosOdoo(q: string): Promise<{ modelo: string; nombre: string }[]> {
+    const domain = q?.trim()
+      ? ['|', ['model', 'ilike', q.trim()], ['name', 'ilike', q.trim()]]
+      : [];
+    const rows: { model: string; name: string }[] = await this.execute(
+      'ir.model', 'search_read',
+      [domain],
+      { fields: ['model', 'name'], limit: 30, order: 'model asc' },
+    );
+    return rows.map(r => ({ modelo: r.model, nombre: r.name }));
+  }
+
   // ── Descubrir campos de modelo Odoo ────────────────────────────────────────
 
   async obtenerCamposOdoo(modelo: string): Promise<CampoOdooInfo[]> {

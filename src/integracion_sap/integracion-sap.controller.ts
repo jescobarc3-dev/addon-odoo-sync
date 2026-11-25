@@ -416,6 +416,13 @@ export class IntegracionSapController {
     return this.destinoOdooService.listar(empresa);
   }
 
+  @Get('destinos-odoo/modelos-odoo')
+  @RequirePermiso('integracion-sap:mapear')
+  @ApiOperation({ summary: 'Buscar modelos disponibles en Odoo (ir.model)' })
+  async buscarModelosOdoo(@Query('q') q = '') {
+    return this.destinoOdooService.buscarModelosOdoo(q);
+  }
+
   @Get('destinos-odoo/campos-odoo')
   @RequirePermiso('integracion-sap:mapear')
   @ApiOperation({ summary: 'Obtener campos escribibles de un modelo Odoo' })

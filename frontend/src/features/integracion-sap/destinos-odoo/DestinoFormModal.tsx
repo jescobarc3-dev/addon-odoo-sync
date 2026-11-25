@@ -2,15 +2,16 @@
 
 import {
   Modal, Stack, TextInput, Select, Switch, Button, Group, Table,
-  ActionIcon, Text, Alert, Badge, Divider, Loader, ScrollArea,
+  ActionIcon, Text, Alert, Divider, Loader, ScrollArea, Autocomplete, Box,
 } from '@mantine/core';
 import { IconPlus, IconTrash, IconDownload, IconAlertTriangle } from '@tabler/icons-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { notifications } from '@mantine/notifications';
 import {
   useCrearDestinoOdooMutation,
   useActualizarDestinoOdooMutation,
   useLazyGetCamposOdooModeloQuery,
+  useLazyGetModelosOdooQuery,
   DestinoOdoo,
   DestinoCampo,
   CampoOdooInfo,
@@ -80,9 +81,13 @@ export function DestinoFormModal({ opened, onClose, destino, empresa }: Props) {
   const [camposOdoo, setCamposOdoo] = useState<CampoOdooInfo[]>([]);
   const [errorCampos, setErrorCampos] = useState<string | null>(null);
 
+  const [modeloOpciones, setModeloOpciones] = useState<{ modelo: string; nombre: string }[]>([]);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [crear, { isLoading: creando }] = useCrearDestinoOdooMutation();
   const [actualizar, { isLoading: actualizando }] = useActualizarDestinoOdooMutation();
   const [fetchCampos, { isFetching: cargandoCampos }] = useLazyGetCamposOdooModeloQuery();
+  const [fetchModelos] = useLazyGetModelosOdooQuery();
 
   useEffect(() => {
     if (opened && destino) {
@@ -99,7 +104,20 @@ export function DestinoFormModal({ opened, onClose, destino, empresa }: Props) {
       setClaveOdoo(null); setAutoSync(false); setCampos([]); setCamposOdoo([]);
     }
     setErrorCampos(null);
+    setModeloOpciones([]);
   }, [opened, destino]);
+
+  const handleModeloSearch = (q: string) => {
+    setModelo(q);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (q.trim().length < 2) return;
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetchModelos({ q: q.trim() }).unwrap();
+        setModeloOpciones(res);
+      } catch { /* silencioso */ }
+    }, 350);
+  };
 
   const handleCargarCampos = async () => {
     if (!modelo.trim()) return;
@@ -187,11 +205,20 @@ export function DestinoFormModal({ opened, onClose, destino, empresa }: Props) {
         />
 
         <Group align="flex-end" gap="sm">
-          <TextInput
-            label="Modelo Odoo (técnico)"
-            placeholder="Ej: pt.ubicacion.puesto"
+          <Autocomplete
+            label="Modelo Odoo"
+            description="Escribe el nombre técnico o descripción para buscar"
+            placeholder="Ej: fleet, ubicacion, employee..."
             value={modelo}
-            onChange={e => setModelo(e.currentTarget.value)}
+            onChange={handleModeloSearch}
+            onOptionSubmit={(val) => setModelo(val)}
+            data={modeloOpciones.map(m => ({ value: m.modelo, label: m.nombre }))}
+            renderOption={({ option }) => (
+              <Box py={2}>
+                <Text size="sm" fw={600} ff="monospace" c="dark">{option.value}</Text>
+                <Text size="xs" c="dimmed">{option.label}</Text>
+              </Box>
+            )}
             style={{ flex: 1 }}
             required
           />

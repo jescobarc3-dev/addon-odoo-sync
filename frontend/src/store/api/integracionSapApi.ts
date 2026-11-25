@@ -316,6 +316,9 @@ export const integracionSapApi = createApi({
       query: (params) => ({ url: '/destinos-odoo', params }),
       providesTags: ['DestinoOdoo'],
     }),
+    getModelosOdoo: builder.query<{ modelo: string; nombre: string }[], { q: string }>({
+      query: (params) => ({ url: '/destinos-odoo/modelos-odoo', params }),
+    }),
     getCamposOdooModelo: builder.query<CampoOdooInfo[], { modelo: string }>({
       query: ({ modelo }) => ({ url: '/destinos-odoo/campos-odoo', params: { modelo } }),
     }),
@@ -399,6 +402,7 @@ export const {
   useGetDestinosOdooQuery,
   useGetCamposOdooModeloQuery,
   useLazyGetCamposOdooModeloQuery,
+  useLazyGetModelosOdooQuery,
   useCrearDestinoOdooMutation,
   useActualizarDestinoOdooMutation,
   useEliminarDestinoOdooMutation,
