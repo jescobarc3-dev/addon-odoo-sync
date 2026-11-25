@@ -210,7 +210,8 @@ export function CatalogoUbicacionesPage() {
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th w={70}>Puesto</Table.Th>
-                  <Table.Th>Cliente / Sucursal</Table.Th>
+                  <Table.Th w={120}>Cliente / Grupo</Table.Th>
+                  <Table.Th>Sucursal / Dirección</Table.Th>
                   <Table.Th w={130}>Área</Table.Th>
                   <Table.Th w={130}>Industria</Table.Th>
                   <Table.Th>Depto / Municipio</Table.Th>
@@ -222,7 +223,7 @@ export function CatalogoUbicacionesPage() {
               <Table.Tbody>
                 {data.items.length === 0 && (
                   <Table.Tr>
-                    <Table.Td colSpan={8}>
+                    <Table.Td colSpan={9}>
                       <Text c="dimmed" ta="center" py="md">Sin resultados</Text>
                     </Table.Td>
                   </Table.Tr>
@@ -233,10 +234,12 @@ export function CatalogoUbicacionesPage() {
                       <Text ff="monospace" fw={600}>{u.puesto}</Text>
                     </Table.Td>
                     <Table.Td>
+                      <Text size="xs" fw={700}>{u.cliente ?? '—'}</Text>
+                    </Table.Td>
+                    <Table.Td>
                       <Stack gap={2}>
-                        <Text size="xs" fw={500}>{u.cliente ?? '—'}</Text>
                         {u.sucursal && u.sucursal !== u.cliente && (
-                          <Text size="xs" c="dimmed">{u.sucursal}</Text>
+                          <Text size="xs" fw={500}>{u.sucursal}</Text>
                         )}
                         {u.direccion && (
                           <Text size="xs" c="dimmed" lineClamp={1}>{u.direccion}</Text>
