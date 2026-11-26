@@ -3,6 +3,7 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import * as XLSX from 'xlsx';
+import * as ExcelJS from 'exceljs';
 import { ApiTags, ApiOperation, ApiCookieAuth } from '@nestjs/swagger';
 import {
   IRegistroSincronizacionRepository,
@@ -246,22 +247,25 @@ export class IntegracionSapController {
   @ApiOperation({ summary: 'Descargar catálogo de artículos como Excel limpio' })
   async descargarItems(@Query('empresa') empresa = 'DEFAULT', @Res() res: Response) {
     const items = await this.catalogoService.buscarTodos(empresa);
-    const rows = items.map(i => ({
-      'Código SAP': i.itemCode,
-      'Nombre / Descripción': i.itemName,
-      'Unidad de Medida': i.uomCode ?? '',
-      'Precio Unitario (Q)': i.precioUnitario ?? '',
-      'Cantidad SAP': i.cantidadSap ?? '',
+    const filas = items.map(i => ({
+      codigo: i.itemCode,
+      nombre: i.itemName,
+      um: i.uomCode ?? '',
+      precio: i.precioUnitario ?? null,
+      cantidad: i.cantidadSap ?? null,
     }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Artículos');
-    const buffer: Buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-    const fecha = new Date().toISOString().slice(0, 10);
-    res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="catalogo-articulos-${fecha}.xlsx"`,
+    await this._enviarExcel(res, {
+      nombreArchivo: 'catalogo-articulos',
+      hoja: 'Artículos',
+      columnas: [
+        { header: 'Código SAP', key: 'codigo', width: 16 },
+        { header: 'Nombre / Descripción', key: 'nombre', width: 50 },
+        { header: 'Unidad de Medida', key: 'um', width: 18 },
+        { header: 'Precio Unitario (Q)', key: 'precio', width: 20, numFmt: '#,##0.0000' },
+        { header: 'Cantidad SAP', key: 'cantidad', width: 16, numFmt: '#,##0.00' },
+      ],
+      filas,
     });
-    res.send(buffer);
   }
 
   // ── CATÁLOGO DE EMPLEADOS ────────────────────────────────────────────────
@@ -316,26 +320,33 @@ export class IntegracionSapController {
   @ApiOperation({ summary: 'Descargar catálogo de empleados como Excel limpio' })
   async descargarEmpleados(@Query('empresa') empresa = 'DEFAULT', @Res() res: Response) {
     const empleados = await this.catalogoEmpleadoService.buscarTodos(empresa);
-    const rows = empleados.map(e => ({
-      Código: e.empleadoCodigo,
-      'Nombre Completo': e.nombreCompleto,
-      Departamento: e.departamento ?? '',
-      Puesto: e.puesto ?? '',
-      DPI: e.dpi ?? '',
-      'Correo de Trabajo': e.correoTrabajo ?? '',
-      Teléfono: e.telefono ?? '',
-      'Fecha de Ingreso': e.fechaIngreso ?? '',
-      'Estado Sinc. Odoo': e.odooSincEstado ?? '',
+    const filas = empleados.map(e => ({
+      codigo: e.empleadoCodigo,
+      nombre: e.nombreCompleto,
+      departamento: e.departamento ?? '',
+      puesto: e.puesto ?? '',
+      dpi: e.dpi ?? '',
+      correo: e.correoTrabajo ?? '',
+      telefono: e.telefono ?? '',
+      fechaIngreso: e.fechaIngreso ?? '',
+      estadoSinc: e.odooSincEstado ?? '',
     }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Empleados');
-    const buffer: Buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-    const fecha = new Date().toISOString().slice(0, 10);
-    res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="catalogo-empleados-${fecha}.xlsx"`,
+    await this._enviarExcel(res, {
+      nombreArchivo: 'catalogo-empleados',
+      hoja: 'Empleados',
+      columnas: [
+        { header: 'Código', key: 'codigo', width: 14 },
+        { header: 'Nombre Completo', key: 'nombre', width: 38 },
+        { header: 'Departamento', key: 'departamento', width: 28 },
+        { header: 'Puesto', key: 'puesto', width: 28 },
+        { header: 'DPI', key: 'dpi', width: 20 },
+        { header: 'Correo de Trabajo', key: 'correo', width: 36 },
+        { header: 'Teléfono', key: 'telefono', width: 16 },
+        { header: 'Fecha de Ingreso', key: 'fechaIngreso', width: 20 },
+        { header: 'Estado Sinc. Odoo', key: 'estadoSinc', width: 20 },
+      ],
+      filas,
     });
-    res.send(buffer);
   }
 
   @Get('catalogo/comparacion')
@@ -464,33 +475,47 @@ export class IntegracionSapController {
   @ApiOperation({ summary: 'Descargar catálogo de ubicaciones como Excel limpio' })
   async descargarUbicaciones(@Query('empresa') empresa = 'DEFAULT', @Res() res: Response) {
     const ubicaciones = await this.catalogoUbicacionService.buscarTodos(empresa);
-    const rows = ubicaciones.map(u => ({
-      Puesto: u.puesto,
-      Cliente: u.cliente ?? '',
-      'Razón Social': u.razonSocial ?? '',
-      Sucursal: u.sucursal ?? '',
-      'Área / Distrito': u.area ?? '',
-      Industria: u.industria ?? '',
-      Departamento: u.departamento ?? '',
-      Municipio: u.municipio ?? '',
-      Zona: u.zona ?? '',
-      Dirección: u.direccion ?? '',
-      Categoría: u.categoria ?? '',
-      'Encargado de Área': u.encargadoArea ?? '',
-      Facturación: u.facturacion ?? '',
-      Posiciones: u.posiciones.join(', '),
-      'Score Calidad': u.calidadScore,
-      Issues: u.issues.join('; '),
+    const filas = ubicaciones.map(u => ({
+      puesto: u.puesto,
+      cliente: u.cliente ?? '',
+      razonSocial: u.razonSocial ?? '',
+      sucursal: u.sucursal ?? '',
+      area: u.area ?? '',
+      industria: u.industria ?? '',
+      departamento: u.departamento ?? '',
+      municipio: u.municipio ?? '',
+      zona: u.zona ?? '',
+      direccion: u.direccion ?? '',
+      categoria: u.categoria ?? '',
+      encargadoArea: u.encargadoArea ?? '',
+      facturacion: u.facturacion ?? '',
+      posiciones: u.posiciones.join(', '),
+      scoreCalidad: u.calidadScore,
+      issues: u.issues.join('; '),
     }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Ubicaciones');
-    const buffer: Buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-    const fecha = new Date().toISOString().slice(0, 10);
-    res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="catalogo-ubicaciones-${fecha}.xlsx"`,
+    await this._enviarExcel(res, {
+      nombreArchivo: 'catalogo-ubicaciones',
+      hoja: 'Ubicaciones',
+      columnas: [
+        { header: 'Puesto', key: 'puesto', width: 10 },
+        { header: 'Cliente', key: 'cliente', width: 28 },
+        { header: 'Razón Social', key: 'razonSocial', width: 36 },
+        { header: 'Sucursal', key: 'sucursal', width: 36 },
+        { header: 'Área / Distrito', key: 'area', width: 20 },
+        { header: 'Industria', key: 'industria', width: 22 },
+        { header: 'Departamento', key: 'departamento', width: 22 },
+        { header: 'Municipio', key: 'municipio', width: 22 },
+        { header: 'Zona', key: 'zona', width: 8 },
+        { header: 'Dirección', key: 'direccion', width: 50 },
+        { header: 'Categoría', key: 'categoria', width: 24 },
+        { header: 'Encargado de Área', key: 'encargadoArea', width: 30 },
+        { header: 'Facturación', key: 'facturacion', width: 18 },
+        { header: 'Posiciones', key: 'posiciones', width: 40 },
+        { header: 'Score Calidad', key: 'scoreCalidad', width: 14 },
+        { header: 'Issues', key: 'issues', width: 50 },
+      ],
+      filas,
     });
-    res.send(buffer);
   }
 
   // ── DESTINOS ODOO ────────────────────────────────────────────────────────
@@ -545,5 +570,73 @@ export class IntegracionSapController {
   @ApiOperation({ summary: 'Ejecutar sincronización de un destino hacia Odoo' })
   sincronizarDestino(@Param('id', ParseIntPipe) id: number) {
     return this.destinoOdooService.sincronizar(id);
+  }
+
+  // ── Generador de Excel con formato corporativo ───────────────────────────
+
+  private async _enviarExcel(
+    res: Response,
+    opts: {
+      nombreArchivo: string;
+      hoja: string;
+      columnas: { header: string; key: string; width: number; numFmt?: string }[];
+      filas: Record<string, any>[];
+    },
+  ): Promise<void> {
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'pt-sync';
+    wb.created = new Date();
+
+    const ws = wb.addWorksheet(opts.hoja, {
+      views: [{ state: 'frozen', ySplit: 1, xSplit: 0 }],
+      pageSetup: { fitToPage: true, fitToWidth: 1, orientation: 'landscape' },
+    });
+
+    ws.columns = opts.columnas.map(c => ({ header: c.header, key: c.key, width: c.width }));
+
+    // Estilo de encabezados
+    const headerRow = ws.getRow(1);
+    headerRow.height = 24;
+    headerRow.eachCell(cell => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11, name: 'Calibri' };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A365D' } };
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: false };
+      cell.border = {
+        bottom: { style: 'medium', color: { argb: 'FF0F2D56' } },
+        right: { style: 'thin', color: { argb: 'FF2A4D7D' } },
+      };
+    });
+
+    // Filas de datos con bandas alternadas
+    opts.filas.forEach((fila, idx) => {
+      const row = ws.addRow(fila);
+      row.height = 17;
+      const esPar = idx % 2 === 0;
+      row.eachCell({ includeEmpty: true }, (cell, colIdx) => {
+        cell.font = { name: 'Calibri', size: 10 };
+        cell.fill = esPar
+          ? { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }
+          : { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F4F8' } };
+        cell.border = {
+          top: { style: 'hair', color: { argb: 'FFD0D0D0' } },
+          bottom: { style: 'hair', color: { argb: 'FFD0D0D0' } },
+          left: { style: 'hair', color: { argb: 'FFD0D0D0' } },
+          right: { style: 'hair', color: { argb: 'FFD0D0D0' } },
+        };
+        const col = opts.columnas[colIdx - 1];
+        if (col?.numFmt) cell.numFmt = col.numFmt;
+      });
+    });
+
+    // Auto-filtro en encabezados
+    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: opts.columnas.length } };
+
+    const buffer = Buffer.from(await wb.xlsx.writeBuffer());
+    const fecha = new Date().toISOString().slice(0, 10);
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${opts.nombreArchivo}-${fecha}.xlsx"`,
+    });
+    res.send(buffer);
   }
 }
