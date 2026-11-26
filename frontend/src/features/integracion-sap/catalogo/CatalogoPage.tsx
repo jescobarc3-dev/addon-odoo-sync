@@ -6,7 +6,7 @@ import {
 } from '@mantine/core';
 import {
   IconSearch, IconPackage, IconAlertTriangle, IconDatabase,
-  IconRefresh, IconCheck, IconX, IconArrowUp, IconArrowDown, IconArrowsSort, IconRefreshAlert,
+  IconRefresh, IconCheck, IconX, IconArrowUp, IconArrowDown, IconArrowsSort, IconRefreshAlert, IconDownload,
 } from '@tabler/icons-react';
 import { useState, useMemo } from 'react';
 import { useGetComparacionCatalogoQuery, useGetDashboardQuery } from '@/store/api/integracionSapApi';
@@ -76,8 +76,21 @@ function SortTh({
 type FiltroOdoo = 'todos' | 'en_odoo' | 'no_odoo';
 type FiltroDif = 'todos' | 'igual' | 'con_dif' | 'addon_cero' | 'sin_precio' | 'con_stock' | 'sin_stock';
 
+async function descargarExcel(ruta: string, nombre: string) {
+  const res = await fetch(ruta, { credentials: 'include' });
+  if (!res.ok) return;
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nombre;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function CatalogoPage() {
   const [q, setQ] = useState('');
+  const [descargando, setDescargando] = useState(false);
   const [debouncedQ] = useDebouncedValue(q, 350);
   const [page, setPage] = useState(1);
   const LIMIT = 50;
@@ -189,11 +202,29 @@ export function CatalogoPage() {
               </Text>
             </Box>
           </Group>
-          <Tooltip label="Recargar datos de Odoo">
-            <ActionIcon variant="light" color="blue" size="lg" loading={isFetching} onClick={() => refetch()}>
-              <IconRefresh size={16} />
-            </ActionIcon>
-          </Tooltip>
+          <Group gap="xs">
+            <Tooltip label="Descargar catálogo limpio (Excel)">
+              <ActionIcon
+                variant="light" color="teal" size="lg"
+                loading={descargando}
+                onClick={async () => {
+                  setDescargando(true);
+                  await descargarExcel(
+                    '/api/integracion-sap/catalogo/items/descargar',
+                    'catalogo-articulos.xlsx',
+                  );
+                  setDescargando(false);
+                }}
+              >
+                <IconDownload size={16} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Recargar datos de Odoo">
+              <ActionIcon variant="light" color="blue" size="lg" loading={isFetching} onClick={() => refetch()}>
+                <IconRefresh size={16} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
         </Group>
       </Card>
 

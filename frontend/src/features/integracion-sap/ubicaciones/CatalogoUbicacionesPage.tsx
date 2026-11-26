@@ -7,7 +7,7 @@ import {
 } from '@mantine/core';
 import {
   IconSearch, IconMapPin, IconAlertTriangle, IconCheck,
-  IconBuilding, IconFilter, IconInfoCircle, IconUpload,
+  IconBuilding, IconFilter, IconInfoCircle, IconUpload, IconDownload,
 } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useGetCatalogoUbicacionesQuery, useGetResumenUbicacionesQuery } from '@/store/api/integracionSapApi';
@@ -23,8 +23,21 @@ const LABEL_FACTURACION: Record<string, string> = {
   'NO COSTEADOS': 'No costeados',
 };
 
+async function descargarExcel(ruta: string, nombre: string) {
+  const res = await fetch(ruta, { credentials: 'include' });
+  if (!res.ok) return;
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nombre;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function CatalogoUbicacionesPage() {
   const [empresa] = useState('DEFAULT');
+  const [descargando, setDescargando] = useState(false);
   const [q, setQ] = useState('');
   const [cliente, setCliente] = useState<string | null>(null);
   const [area, setArea] = useState<string | null>(null);
@@ -64,11 +77,29 @@ export function CatalogoUbicacionesPage() {
           <Title order={3}>Catálogo de Ubicaciones</Title>
           <Text size="sm" c="dimmed">Puestos físicos — gobierno de datos activo</Text>
         </Stack>
-        <Link href="/integracion-sap/ubicaciones/carga">
-          <ActionIcon variant="light" size="lg" title="Cargar Excel">
-            <IconUpload size={18} />
-          </ActionIcon>
-        </Link>
+        <Group gap="xs">
+          <Tooltip label="Descargar catálogo limpio (Excel)">
+            <ActionIcon
+              variant="light" size="lg" color="teal"
+              loading={descargando}
+              onClick={async () => {
+                setDescargando(true);
+                await descargarExcel(
+                  `/api/integracion-sap/catalogo/ubicaciones/descargar?empresa=${empresa}`,
+                  `catalogo-ubicaciones.xlsx`,
+                );
+                setDescargando(false);
+              }}
+            >
+              <IconDownload size={18} />
+            </ActionIcon>
+          </Tooltip>
+          <Link href="/integracion-sap/ubicaciones/carga">
+            <ActionIcon variant="light" size="lg" title="Cargar Excel">
+              <IconUpload size={18} />
+            </ActionIcon>
+          </Link>
+        </Group>
       </Group>
 
       {/* Resumen de calidad */}

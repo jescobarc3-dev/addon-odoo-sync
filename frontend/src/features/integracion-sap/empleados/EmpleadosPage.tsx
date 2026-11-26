@@ -6,7 +6,7 @@ import {
 } from '@mantine/core';
 import {
   IconSearch, IconUsers, IconAlertTriangle, IconDatabase,
-  IconArrowUp, IconArrowDown, IconArrowsSort,
+  IconArrowUp, IconArrowDown, IconArrowsSort, IconDownload,
 } from '@tabler/icons-react';
 import { useState, useMemo } from 'react';
 import { useGetComparacionEmpleadosQuery } from '@/store/api/integracionSapApi';
@@ -59,8 +59,21 @@ function SortTh({
   );
 }
 
+async function descargarExcel(ruta: string, nombre: string) {
+  const res = await fetch(ruta, { credentials: 'include' });
+  if (!res.ok) return;
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nombre;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function EmpleadosPage() {
   const [q, setQ] = useState('');
+  const [descargando, setDescargando] = useState(false);
   const [debouncedQ] = useDebouncedValue(q, 300);
   const [page, setPage] = useState(1);
   const [filtroOdoo, setFiltroOdoo] = useState('todos');
@@ -128,6 +141,22 @@ export function EmpleadosPage() {
               </Text>
             </Group>
           </Box>
+          <Tooltip label="Descargar catálogo limpio (Excel)">
+            <ActionIcon
+              variant="light" color="teal" size="lg"
+              loading={descargando}
+              onClick={async () => {
+                setDescargando(true);
+                await descargarExcel(
+                  '/api/integracion-sap/empleados/descargar',
+                  'catalogo-empleados.xlsx',
+                );
+                setDescargando(false);
+              }}
+            >
+              <IconDownload size={16} />
+            </ActionIcon>
+          </Tooltip>
         </Group>
       </Group>
 

@@ -114,4 +114,8 @@ export class CatalogoEmpleadoService {
   async contarActivos(empresa: string): Promise<number> {
     return this.repo.count({ where: { empresaCodigo: empresa, activo: true } });
   }
+
+  async buscarTodos(empresa: string): Promise<CatalogoEmpleadoOrmEntity[]> {
+    return this.repo.find({ where: { empresaCodigo: empresa, activo: true }, order: { nombreCompleto: 'ASC' } });
+  }
 }

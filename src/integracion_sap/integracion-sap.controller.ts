@@ -1,6 +1,8 @@
 import {
-  Controller, Get, Post, Put, Delete, Param, Body, Query, ParseIntPipe, DefaultValuePipe, Inject, UseGuards,
+  Controller, Get, Post, Put, Delete, Param, Body, Query, ParseIntPipe, DefaultValuePipe, Inject, UseGuards, Res,
 } from '@nestjs/common';
+import { Response } from 'express';
+import * as XLSX from 'xlsx';
 import { ApiTags, ApiOperation, ApiCookieAuth } from '@nestjs/swagger';
 import {
   IRegistroSincronizacionRepository,
@@ -239,6 +241,29 @@ export class IntegracionSapController {
     return { items, total };
   }
 
+  @Get('catalogo/items/descargar')
+  @RequirePermiso('integracion-sap:read')
+  @ApiOperation({ summary: 'Descargar catálogo de artículos como Excel limpio' })
+  async descargarItems(@Query('empresa') empresa = 'DEFAULT', @Res() res: Response) {
+    const items = await this.catalogoService.buscarTodos(empresa);
+    const rows = items.map(i => ({
+      'Código SAP': i.itemCode,
+      'Nombre / Descripción': i.itemName,
+      'Unidad de Medida': i.uomCode ?? '',
+      'Precio Unitario (Q)': i.precioUnitario ?? '',
+      'Cantidad SAP': i.cantidadSap ?? '',
+    }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Artículos');
+    const buffer: Buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const fecha = new Date().toISOString().slice(0, 10);
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="catalogo-articulos-${fecha}.xlsx"`,
+    });
+    res.send(buffer);
+  }
+
   // ── CATÁLOGO DE EMPLEADOS ────────────────────────────────────────────────
 
   @Get('empleados/comparacion')
@@ -284,6 +309,33 @@ export class IntegracionSapController {
         odoo: odooMap.get(local.empleadoCodigo) ?? null,
       })),
     };
+  }
+
+  @Get('empleados/descargar')
+  @RequirePermiso('integracion-sap:read')
+  @ApiOperation({ summary: 'Descargar catálogo de empleados como Excel limpio' })
+  async descargarEmpleados(@Query('empresa') empresa = 'DEFAULT', @Res() res: Response) {
+    const empleados = await this.catalogoEmpleadoService.buscarTodos(empresa);
+    const rows = empleados.map(e => ({
+      Código: e.empleadoCodigo,
+      'Nombre Completo': e.nombreCompleto,
+      Departamento: e.departamento ?? '',
+      Puesto: e.puesto ?? '',
+      DPI: e.dpi ?? '',
+      'Correo de Trabajo': e.correoTrabajo ?? '',
+      Teléfono: e.telefono ?? '',
+      'Fecha de Ingreso': e.fechaIngreso ?? '',
+      'Estado Sinc. Odoo': e.odooSincEstado ?? '',
+    }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Empleados');
+    const buffer: Buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const fecha = new Date().toISOString().slice(0, 10);
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="catalogo-empleados-${fecha}.xlsx"`,
+    });
+    res.send(buffer);
   }
 
   @Get('catalogo/comparacion')
@@ -405,6 +457,40 @@ export class IntegracionSapController {
   @ApiOperation({ summary: 'Resumen de calidad del catálogo de ubicaciones' })
   async resumenUbicaciones(@Query('empresa') empresa = 'DEFAULT') {
     return this.catalogoUbicacionService.contarActivos(empresa);
+  }
+
+  @Get('catalogo/ubicaciones/descargar')
+  @RequirePermiso('integracion-sap:read')
+  @ApiOperation({ summary: 'Descargar catálogo de ubicaciones como Excel limpio' })
+  async descargarUbicaciones(@Query('empresa') empresa = 'DEFAULT', @Res() res: Response) {
+    const ubicaciones = await this.catalogoUbicacionService.buscarTodos(empresa);
+    const rows = ubicaciones.map(u => ({
+      Puesto: u.puesto,
+      Cliente: u.cliente ?? '',
+      'Razón Social': u.razonSocial ?? '',
+      Sucursal: u.sucursal ?? '',
+      'Área / Distrito': u.area ?? '',
+      Industria: u.industria ?? '',
+      Departamento: u.departamento ?? '',
+      Municipio: u.municipio ?? '',
+      Zona: u.zona ?? '',
+      Dirección: u.direccion ?? '',
+      Categoría: u.categoria ?? '',
+      'Encargado de Área': u.encargadoArea ?? '',
+      Facturación: u.facturacion ?? '',
+      Posiciones: u.posiciones.join(', '),
+      'Score Calidad': u.calidadScore,
+      Issues: u.issues.join('; '),
+    }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Ubicaciones');
+    const buffer: Buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const fecha = new Date().toISOString().slice(0, 10);
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="catalogo-ubicaciones-${fecha}.xlsx"`,
+    });
+    res.send(buffer);
   }
 
   // ── DESTINOS ODOO ────────────────────────────────────────────────────────
